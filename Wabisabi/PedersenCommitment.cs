@@ -3,36 +3,44 @@ using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {
-	public readonly struct PedersenCommitment
+	public class PedersenCommitment : IEquatable<PedersenCommitment>
 	{
 		private static readonly GE G = GEs.Gg;
 		private static readonly GE H = GEs.Gh;
 
+
 		// Secret blinding factor.
-		public readonly Scalar x;
+		public Scalar BlindingFactor { get; }
 		// Amount being committed to.
-		public readonly Scalar a;
-		private readonly bool preserveSecrets;
-		private readonly GE commitment;
+		public Scalar Value { get; }
+		private readonly bool _preserveSecrets;
+		private readonly GE _commitment;
 
 		public PedersenCommitment(Scalar blindingFactor, Scalar value)
 		{
 			if (blindingFactor.IsZero) throw new ArgumentOutOfRangeException(nameof(blindingFactor));
-			this.x = blindingFactor;
-			this.a = value;
-			this.preserveSecrets = true;
+			this.BlindingFactor = blindingFactor;
+			this.Value = value;
+			this._preserveSecrets = true;
 
-			// Pedersen commitment C = xG + aH
-			this.commitment = (x * G).AddVariable(a * H, out _).ToGroupElement();
+			var x = blindingFactor;
+			var a = value;
+			this._commitment = (x * G).AddVariable(a * H, out _).ToGroupElement();
+			if (this._commitment.IsInfinity)
+			{
+				throw new ArgumentException($"commitment cannot be Infinity.");
+			}
 		}
 
-		internal PedersenCommitment(GE commitment)
+		private PedersenCommitment(GE commitment)
 		{
+			if (commitment.IsInfinity)
+			{
+				throw new ArgumentException("commitment cannot be Infinity.");
+			}
 			// Only the commitment is known, this is how the commitment will be seen by most users.
-			this.preserveSecrets = false;
-			this.commitment = commitment;
-			this.x = Scalar.Zero;
-			this.a = Scalar.Zero;
+			this._preserveSecrets = false;
+			this._commitment = commitment;
 		}
 
 		public bool Verify(Scalar blindingFactor, Scalar value)
@@ -47,29 +55,30 @@ namespace Wabisabi
 			// So Commit(x1, a1) + Commit(x2, a2) = Commit((x1 + x2), (a1 + a2))
 
 			// Preserve secrets in the result if they are known.
-			if (c1.preserveSecrets && c2.preserveSecrets)
+			if (c1._preserveSecrets && c2._preserveSecrets)
 			{
-				return new PedersenCommitment(c1.x.Add(c2.x), c1.a.Add(c2.a));
+				return new PedersenCommitment(c1.BlindingFactor.Add(c2.BlindingFactor), c1.Value.Add(c2.Value));
 			}
 			// The secret values were not available, just give back the summed commitment.
-			return new PedersenCommitment(c1.commitment.ToGroupElementJacobian().Add(c2.commitment).ToGroupElement());
+			return new PedersenCommitment(c1._commitment.ToGroupElementJacobian().Add(c2._commitment).ToGroupElement());
 		}
 
 		public static PedersenCommitment operator - (PedersenCommitment c1, PedersenCommitment c2)
 		{
-			// Preserve secrets in the result if they are known.
-			if (c1.preserveSecrets && c2.preserveSecrets)
-			{
-				return new PedersenCommitment(c1.x.Add(c2.x.Negate()), c1.a.Add(c2.a.Negate()));
-			}
-			// The secret values were not available, just give back the summed commitment.
-			return new PedersenCommitment(c1.commitment.ToGroupElementJacobian().Add(c2.commitment.Negate()).ToGroupElement());
+			return c1 + c2.Negate();
 		}
 
+		public PedersenCommitment Negate()
+		{
+			return _preserveSecrets
+				? new PedersenCommitment(BlindingFactor.Negate(), Value.Negate())
+				: new PedersenCommitment(_commitment.Negate());
+		}
+		
 		public static bool operator == (PedersenCommitment c1, PedersenCommitment c2) => c1.Equals(c2);
 		public static bool operator != (PedersenCommitment c1, PedersenCommitment c2)=> !c1.Equals(c2);
 
-		public readonly override bool Equals(object obj)
+		public override bool Equals(object obj)
 		{
 			if (obj is PedersenCommitment other)
 			{
@@ -81,8 +90,13 @@ namespace Wabisabi
 		public bool Equals(PedersenCommitment other)
 		{
 			// Using & because we need constant-time comparisons
-			return (this.commitment.x == other.commitment.x)
-				 & (this.commitment.y == other.commitment.y);
+			return (this._commitment.x == other._commitment.x)
+				 & (this._commitment.y == other._commitment.y);
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(BlindingFactor, Value, _preserveSecrets, _commitment);
 		}
 	}
 }

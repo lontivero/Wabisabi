@@ -2,26 +2,27 @@ using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {
-    public readonly partial struct GAttribute
+	public class GAttribute : PedersenCommitment
 	{
-		private readonly PedersenCommitment pe;
-		private readonly Scalar blindingFactor;
+		public GAttribute(ulong attr)
+			:  this(new Scalar((uint)(attr >> 32), (uint)attr, 0, 0 ,0 , 0, 0, 0  ))
+		{
+		}
 
 		public GAttribute(Scalar attr)
-			:  this(attr, Crypto.RandomScalar())
+			:  this(Crypto.RandomScalar(), attr)
 		{
 		}
 
-		public GAttribute(Scalar attr, Scalar blindingFactor)
+		public GAttribute(Scalar blindingFactor, Scalar attr)
+			: base(blindingFactor, attr)
 		{
-			this.blindingFactor = blindingFactor;
-			this.pe = new PedersenCommitment(attr, blindingFactor);
 		}
 
-		public static GAttribute operator * (GAttribute a, GAttribute b)
+		public static GAttribute operator + (GAttribute a, GAttribute b)
 		{
-			var t = a.pe + b.pe;
-			return new GAttribute(t.a, t.x);
+			var t = (PedersenCommitment)a + (PedersenCommitment)b;
+			return new GAttribute(t.BlindingFactor, t.Value);
 		}
 	}
 }
