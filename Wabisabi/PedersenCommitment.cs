@@ -18,7 +18,6 @@ namespace Wabisabi
 
 		public PedersenCommitment(Scalar blindingFactor, Scalar value)
 		{
-			if (blindingFactor.IsZero) throw new ArgumentOutOfRangeException(nameof(blindingFactor));
 			this.BlindingFactor = blindingFactor;
 			this.Value = value;
 			this._preserveSecrets = true;
@@ -26,18 +25,10 @@ namespace Wabisabi
 			var x = blindingFactor;
 			var a = value;
 			this._commitment = (x * G).AddVariable(a * H, out _).ToGroupElement();
-			if (this._commitment.IsInfinity)
-			{
-				throw new ArgumentException($"commitment cannot be Infinity.");
-			}
 		}
 
 		private PedersenCommitment(GE commitment)
 		{
-			if (commitment.IsInfinity)
-			{
-				throw new ArgumentException("commitment cannot be Infinity.");
-			}
 			// Only the commitment is known, this is how the commitment will be seen by most users.
 			this._preserveSecrets = false;
 			this._commitment = commitment;
@@ -89,9 +80,8 @@ namespace Wabisabi
 
 		public bool Equals(PedersenCommitment other)
 		{
-			// Using & because we need constant-time comparisons
-			return (this._commitment.x == other._commitment.x)
-				 & (this._commitment.y == other._commitment.y);
+			return (this._commitment.IsInfinity && other._commitment.IsInfinity)
+			 	|| (this._commitment.x == other._commitment.x && this._commitment.y == other._commitment.y);
 		}
 
 		public override int GetHashCode()

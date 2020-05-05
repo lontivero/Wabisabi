@@ -8,6 +8,24 @@ namespace Wabisabi.Tests
 	public class PedersenCommitmentTests
 	{
 		[Fact]
+		public void Comparison()
+		{
+			var pe = new PedersenCommitment(new Scalar(123456), new Scalar(15_000));
+			var zero1 = pe - pe;
+
+			var pe2 = new PedersenCommitment(new Scalar(654321), new Scalar(57_000));
+			var zero2 = pe2 - pe2;
+
+			Assert.Equal(pe, pe);
+			Assert.Equal(zero1, zero1);
+			Assert.NotEqual(pe, zero1);
+			Assert.NotEqual(zero1, pe);
+
+			Assert.Equal(zero2, zero1);
+			Assert.Equal(zero1, zero2);
+		}
+
+		[Fact]
 		public void ThirdPartyCanVerifyTotalMoneyInSystem()
 		{
 			// Alice has 163,000b in her balance and Bob has 78,000 in his balance
@@ -37,6 +55,7 @@ namespace Wabisabi.Tests
 			Assert.True(commitToAliceNewBalance.Verify(aliceBlindinFactor.Add(valueTransferredBlindinFactor.Negate()), aliceNewBalance));
 			Assert.True(commitToBobNewBalance.Verify(bobBlindinFactor.Add(valueTransferredBlindinFactor), bobNewBalance));
 		}
+
 
 		[Fact]
 		public void ProofAttributeSumOfValueEqual()
