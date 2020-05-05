@@ -9,9 +9,9 @@ namespace Wabisabi
 		private static readonly GE H = GEs.Gh;
 
 		// Secret blinding factor.
-		private readonly Scalar x;
+		public readonly Scalar x;
 		// Amount being committed to.
-		private readonly Scalar a;
+		public readonly Scalar a;
 		private readonly bool preserveSecrets;
 		private readonly GE commitment;
 
