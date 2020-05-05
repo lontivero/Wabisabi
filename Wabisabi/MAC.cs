@@ -18,17 +18,17 @@ namespace Wabisabi
 			this.V = V;
 		}
 
-		public static MAC Compute(Scalar w, (Scalar x0, Scalar x1) sk, GE M)
+		public static MAC Compute(Scalar w, (Scalar x0, Scalar x1) sk, IGroupElement M)
 		{
 			var t = Crypto.RandomScalar();
 			var W = w * Gw;
 			var u = Crypto.RandomScalar();
 			var U = (u * EC.G).ToGroupElement();
-			var V =  W.AddVariable((sk.x0 + sk.x1 * t) * M, out _);
+			var V =  W.AddVariable((sk.x0 + sk.x1 * t) * M.ToGroupElement(), out _);
 			return new MAC(t, U, V.ToGroupElement());
 		}
 
-		public static bool Verify(Scalar w, (Scalar x0, Scalar x1) sk, GE M, MAC mac)
+		public static bool Verify(Scalar w, (Scalar x0, Scalar x1) sk, IGroupElement M, MAC mac)
 		{
 			return Compute(w, sk, M) == mac;
 		}

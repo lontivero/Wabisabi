@@ -1,5 +1,4 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using NBitcoin.Secp256k1;
 using Xunit;
 
@@ -21,8 +20,24 @@ namespace Wabisabi.Tests
 			Assert.NotEqual(pe, zero1);
 			Assert.NotEqual(zero1, pe);
 
+			Assert.Equal(pe, pe + zero1);
+			Assert.Equal(pe, pe - zero1);
+
+			Assert.Equal(pe, zero1 + pe);
+			Assert.Equal(pe.Negate(), zero1 - pe);
+
 			Assert.Equal(zero2, zero1);
 			Assert.Equal(zero1, zero2);
+
+			Assert.Equal(zero1, zero1 - zero2);
+			Assert.Equal(zero1, zero2 - zero1);
+			Assert.Equal(zero2, zero1 - zero2);
+			Assert.Equal(zero2, zero2 - zero1);
+
+			Assert.Equal(zero1, zero1 + zero2);
+			Assert.Equal(zero1, zero2 + zero1);
+			Assert.Equal(zero2, zero1 + zero2);
+			Assert.Equal(zero2, zero2 + zero1);
 		}
 
 		[Fact]
@@ -60,7 +75,7 @@ namespace Wabisabi.Tests
 		[Fact]
 		public void ProofAttributeSumOfValueEqual()
 		{
-			var k = 4;
+			var k = 10;
 			var v = Enumerable.Range(1, k).Select(i => Crypto.RandomScalarForValue()).ToArray();
 			var r = Enumerable.Range(1, k).Select(i => Crypto.RandomScalar()).ToArray();
 			var Mv = Enumerable.Range(0, k).Select(i => new GAttribute(r[i], v[i])).ToArray();

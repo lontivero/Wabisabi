@@ -3,7 +3,12 @@ using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {
-	public class PedersenCommitment : IEquatable<PedersenCommitment>
+	public interface IGroupElement
+	{
+		GE ToGroupElement();
+	}
+
+	public class PedersenCommitment : IGroupElement, IEquatable<PedersenCommitment>
 	{
 		private static readonly GE G = GEs.Gg;
 		private static readonly GE H = GEs.Gh;
@@ -32,6 +37,8 @@ namespace Wabisabi
 			// Only the commitment is known, this is how the commitment will be seen by most users.
 			this._preserveSecrets = false;
 			this._commitment = commitment;
+			this.BlindingFactor = Scalar.Zero;
+			this.Value = Scalar.Zero;
 		}
 
 		public bool Verify(Scalar blindingFactor, Scalar value)
@@ -65,7 +72,12 @@ namespace Wabisabi
 				? new PedersenCommitment(BlindingFactor.Negate(), Value.Negate())
 				: new PedersenCommitment(_commitment.Negate());
 		}
-		
+
+		public GE ToGroupElement()
+		{
+			return _commitment;
+		}
+
 		public static bool operator == (PedersenCommitment c1, PedersenCommitment c2) => c1.Equals(c2);
 		public static bool operator != (PedersenCommitment c1, PedersenCommitment c2)=> !c1.Equals(c2);
 
