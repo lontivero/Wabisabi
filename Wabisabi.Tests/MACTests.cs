@@ -12,8 +12,8 @@ namespace Wabisabi.Tests
 			var w = Crypto.RandomScalar();
 			var sk = (Crypto.RandomScalar(), Crypto.RandomScalar());
 
-			var Mv = new GAttribute( 21_000_000);
-			var Ms = new GAttribute(12_3456_789);
+			var Mv = new GroupAttribute( 21_000_000);
+			var Ms = new GroupAttribute(12_3456_789);
 			var mac = MAC.Compute(w, sk, Mv + Ms);
 
 			Assert.True(MAC.Verify(w, sk, Mv + Ms, mac));
