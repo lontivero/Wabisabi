@@ -5,8 +5,6 @@ namespace Wabisabi
 {
 	public class MAC : IEquatable<MAC>
 	{
-		private static readonly GE Gw = Generators.Gw;
-
 		public readonly Scalar t;
 		public readonly GE U;
 		public readonly GE V;
@@ -18,19 +16,23 @@ namespace Wabisabi
 			this.V = V;
 		}
 
-		public static MAC Compute(Scalar w, (Scalar x0, Scalar x1) sk, IGroupElement M)
+		public static MAC Compute((Scalar x0, Scalar x1) sk, IGroupElement M)
 		{
-			var t = Crypto.RandomScalar();
-			var W = w * Gw;
 			var u = Crypto.RandomScalar();
 			var U = (u * EC.G).ToGroupElement();
-			var V =  W.AddVariable((sk.x0 + sk.x1 * t) * M.ToGroupElement(), out _);
+			return Compute(sk, M, Crypto.RandomScalar(), U);
+		}
+
+		internal static MAC Compute((Scalar x0, Scalar x1) sk, IGroupElement M, Scalar t, GE U)
+		{
+			var V = (sk.x0 + sk.x1 * t) * U;
+			V = V.AddVariable(M.ToGroupElement(), out _);
 			return new MAC(t, U, V.ToGroupElement());
 		}
 
-		public static bool Verify(Scalar w, (Scalar x0, Scalar x1) sk, IGroupElement M, MAC mac)
+		public static bool Verify((Scalar x0, Scalar x1) sk, IGroupElement M, MAC mac)
 		{
-			return Compute(w, sk, M) == mac;
+			return Compute(sk, M, mac.t, mac.U) == mac;
 		}
 
 		public static bool operator == (MAC m1, MAC m2) => m1.Equals(m2);
@@ -56,5 +58,5 @@ namespace Wabisabi
 		{
 			return HashCode.Combine(t, U, V);
 		}
-    }
+	}
 }
