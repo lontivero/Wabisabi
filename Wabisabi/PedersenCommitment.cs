@@ -2,8 +2,7 @@
 using NBitcoin.Secp256k1;
 
 namespace Wabisabi
-{
-	
+{	
 	public class PedersenCommitment : IGroupElement, IEquatable<PedersenCommitment> 
 	{
 		private static readonly GE G = Generators.Gg;
