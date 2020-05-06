@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using NBitcoin.Secp256k1;
@@ -24,6 +25,15 @@ namespace Wabisabi
 		public static readonly GE Gh = GroupElementFromText(nameof(Gh));
 		public static readonly GE GV = GroupElementFromText(nameof(GV));
 
+		public static GE GetNums(int i)
+		{
+			if( !NumsCache.TryGetValue(i, out var ge))
+			{
+				ge = GroupElementFromText(i.ToString());
+				NumsCache.Add(i, ge);
+			}
+			return ge;
+		}
 
 		private static GE GroupElementFromText(string text)
 		{
@@ -38,5 +48,7 @@ namespace Wabisabi
 			}
 			return ge .ToGroupElement();
 		}
+
+		private static readonly Dictionary<int, GE> NumsCache = new Dictionary<int, GE>();
 	}
 }
