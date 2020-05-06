@@ -73,6 +73,15 @@ namespace Wabisabi.Tests
 
 
 		[Fact]
+		public void AttributesAreCommutative()
+		{
+			var a = new GroupAttribute(1_234_567);
+			var b = new GroupAttribute(7_564_321);
+
+			Assert.Equal((a+b), b+a);
+		}
+
+		[Fact]
 		public void ProofAttributeSumOfValueEqual()
 		{
 			var k = 10;
