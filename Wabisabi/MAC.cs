@@ -5,7 +5,7 @@ namespace Wabisabi
 {
 	public class MAC : IEquatable<MAC>
 	{
-		private static readonly GE Gw = GEs.Gw;
+		private static readonly GE Gw = Generators.Gw;
 
 		public readonly Scalar t;
 		public readonly GE U;

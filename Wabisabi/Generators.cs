@@ -1,12 +1,11 @@
-using System;
+﻿using System;
 using System.Security.Cryptography;
 using System.Text;
 using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {
-
-	public class GEs
+	public class Generators
 	{
 		// Generators for ke verification
 		public static readonly GE Gw = GroupElementFromText(nameof(Gw));

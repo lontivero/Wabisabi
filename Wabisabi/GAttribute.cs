@@ -2,7 +2,7 @@ using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {
-	public class GAttribute : PedersenCommitment
+	public class GAttribute : Comm
 	{
 		public GAttribute(ulong attr)
 			:  this(new Scalar((uint)(attr >> 32), (uint)attr, 0, 0 ,0 , 0, 0, 0  ))
@@ -21,7 +21,7 @@ namespace Wabisabi
 
 		public static GAttribute operator + (GAttribute a, GAttribute b)
 		{
-			var t = (PedersenCommitment)a + (PedersenCommitment)b;
+			var t = (Comm)a + (Comm)b;
 			return new GAttribute(t.BlindingFactor, t.Value);
 		}
 	}

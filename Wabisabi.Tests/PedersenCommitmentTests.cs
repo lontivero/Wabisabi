@@ -9,10 +9,10 @@ namespace Wabisabi.Tests
 		[Fact]
 		public void Comparison()
 		{
-			var pe = new PedersenCommitment(new Scalar(123456), new Scalar(15_000));
+			var pe = new Comm(new Scalar(123456), new Scalar(15_000));
 			var zero1 = pe - pe;
 
-			var pe2 = new PedersenCommitment(new Scalar(654321), new Scalar(57_000));
+			var pe2 = new Comm(new Scalar(654321), new Scalar(57_000));
 			var zero2 = pe2 - pe2;
 
 			Assert.Equal(pe, pe);
@@ -49,15 +49,15 @@ namespace Wabisabi.Tests
 			// the total balance in the system didn't change (no money created from thin air)
 			var aliceBalance = new Scalar(163_000u);
 			var aliceBlindinFactor = new Scalar(123456);
-			var commitToAliceBalance = new PedersenCommitment(aliceBlindinFactor, aliceBalance);
+			var commitToAliceBalance = new Comm(aliceBlindinFactor, aliceBalance);
 
 			var bobBalance   = new Scalar( 78_000u);
 			var bobBlindinFactor = new Scalar(987654321);
-			var commitToBobBalance = new PedersenCommitment(bobBlindinFactor, bobBalance);
+			var commitToBobBalance = new Comm(bobBlindinFactor, bobBalance);
 
 			var valueTransferredToBob = new Scalar(25_000);
 			var valueTransferredBlindinFactor = new Scalar(8050);
-			var commitToTransferredValue = new PedersenCommitment(valueTransferredBlindinFactor, valueTransferredToBob);
+			var commitToTransferredValue = new Comm(valueTransferredBlindinFactor, valueTransferredToBob);
 
 			var aliceNewBalance = aliceBalance.Add(valueTransferredToBob.Negate());
 			var bobNewBalance = bobBalance.Add(valueTransferredToBob);
@@ -83,7 +83,7 @@ namespace Wabisabi.Tests
 			var v_sum = v.Aggregate((vi, vj)=> vi + vj);
 			var r_sum = r.Aggregate((ri, rj)=> ri + rj);
 			var Pi_Mv = Mv.Aggregate((Mvi, Mvj) => Mvi + Mvj);
-			var C = new PedersenCommitment(r_sum, v_sum);
+			var C = new Comm(r_sum, v_sum);
 
 			Assert.True(C == Pi_Mv);
 		}
