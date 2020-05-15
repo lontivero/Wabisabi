@@ -37,20 +37,31 @@ namespace Wabisabi
 
 
 		#region Wabisabi MAC functions
-		public static (Scalar x0, Scalar x1, Scalar y0, Scalar y1) GenMACKey()
-			=> (RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
+		public static (Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) GenMACKey()
+			=> (RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
 
-		public static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar x0, Scalar x1, Scalar y0, Scalar y1) sk, GroupElement Mv, GroupElement Ms)
-			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.y0 * Mv) + (sk.y1 * Ms), t: Crypto.RandomScalar(), U: Crypto.RandomScalar() * Generators.G);
+		public static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk, GroupElement Mv, GroupElement Ms)
+			=> ComputeAlgebraicMAC((sk.x0, sk.x1), sk.w * Generators.Gw + (sk.yv * Mv) + (sk.ys * Ms), t: Crypto.RandomScalar(), U: Crypto.RandomScalar() * Generators.G);
 
-		private static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar x0, Scalar x1, Scalar y0, Scalar y1) sk, GroupElement Mv, GroupElement Ms, Scalar t, GroupElement U)
-			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.y0 * Mv) + (sk.y1 * Ms), t, U);
+		private static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk, GroupElement Mv, GroupElement Ms, Scalar t, GroupElement U)
+			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.yv * Mv) + (sk.ys * Ms), t, U);
 
 		public static bool VerifyMAC((Scalar, Scalar, Scalar, Scalar) sk, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) mac)
 			=> MAC(sk, Mv, Ms, mac.t, mac.U) == mac;
 
 		#endregion Wabisabi MAC functions
 
+		#region Parameters
+		
+		public static (GroupElement Cw, GroupElement I) ComputeIParams((Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk)
+			=> ((sk.w * Generators.Gw + sk.wp * Generators.Gwp),
+				(sk.x0.Negate() * Generators.Gx0) + 
+				(sk.x1.Negate() * Generators.Gx1) + 
+				(sk.yv.Negate() * Generators.Gv ) + 
+				(sk.ys.Negate() * Generators.Gs ) +
+				Generators.GV );
+
+		#endregion Parameters
 
 		#region Utils
 
