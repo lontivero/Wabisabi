@@ -4,20 +4,22 @@ using NBitcoin.Secp256k1;
 
 namespace Wabisabi
 {	
+	/*
 	public class PedersenVector : IGroupElement
 	{
-		private readonly List<IGroupElement> _list = new List<IGroupElement>();
-		private GEJ _cachedGEJ = GEJ.Infinity;
+		private readonly List<GroupElement> list = new List<GroupElement>();
+		private GroupElement cachedGEJ;
 
-		public void Add(IGroupElement ge)
+		public void Add(GroupElement ge)
 		{
-			_list.Add(ge);
-			_cachedGEJ = _cachedGEJ.AddVariable(ge.ToGroupElement(), out _);
+			list.Add(ge);
+			cachedGEJ = cachedGEJ + ge;
 		}
 
-		public GE ToGroupElement()
+		public GroupElement ToGroupElement()
 		{
-			return _cachedGEJ.ToGroupElement();
+			return cachedGEJ;
 		}
-	} 
+	}
+	*/
 }
