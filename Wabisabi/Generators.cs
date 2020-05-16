@@ -39,16 +39,17 @@ namespace Wabisabi
 
 		private static GroupElement GroupElementFromText(string text)
 		{
+			FE x;
+			GE ge;
+			int nonce = 0;
 			using var sha256 = SHA256Managed.Create();
-			var alphaBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(text));
-			var alpha = new Scalar(alphaBytes);
-			var ge = alpha * EC.G;
-			while (ge.IsInfinity)
+			do
 			{
-				alpha = alpha.Add(Scalar.One);
-				ge = alpha * EC.G;
+				x = new FE(sha256.ComputeHash(Encoding.UTF8.GetBytes(text + (++nonce))));
 			}
-			return new GroupElement(ge.ToGroupElement());
+			while (!GE.TryCreateXOVariable(x, true, out ge));
+
+			return new GroupElement(ge);
 		}
 
 		private static readonly Dictionary<int, GroupElement> NumsCache = new Dictionary<int, GroupElement>();

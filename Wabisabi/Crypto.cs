@@ -43,10 +43,10 @@ namespace Wabisabi
 		public static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk, GroupElement Mv, GroupElement Ms)
 			=> ComputeAlgebraicMAC((sk.x0, sk.x1), sk.w * Generators.Gw + (sk.yv * Mv) + (sk.ys * Ms), t: Crypto.RandomScalar(), U: Crypto.RandomScalar() * Generators.G);
 
-		private static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk, GroupElement Mv, GroupElement Ms, Scalar t, GroupElement U)
+		private static (Scalar t, GroupElement U, GroupElement V) MAC((Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk, GroupElement Mv, GroupElement Ms, Scalar t, GroupElement U)
 			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.yv * Mv) + (sk.ys * Ms), t, U);
 
-		public static bool VerifyMAC((Scalar, Scalar, Scalar, Scalar) sk, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) mac)
+		public static bool VerifyMAC((Scalar, Scalar, Scalar, Scalar, Scalar, Scalar) sk, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) mac)
 			=> MAC(sk, Mv, Ms, mac.t, mac.U) == mac;
 
 		#endregion Wabisabi MAC functions
