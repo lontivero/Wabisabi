@@ -24,6 +24,14 @@ namespace Wabisabi
 			return new GroupElement(this.ge.Negate());
 		}
 
+		public byte[] ToByteArray()
+		{
+			Span<byte> buffer = stackalloc byte[64];
+			this.ge.x.WriteToSpan(buffer);
+			this.ge.y.WriteToSpan(buffer.Slice(32));
+			return buffer.ToArray();
+		}
+
 		public static GroupElement operator + (in GroupElement a, in GroupElement b)
 		{
 			return new GroupElement(a.ge.ToGroupElementJacobian().AddVariable(b.ge, out _));

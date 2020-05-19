@@ -150,8 +150,8 @@ namespace Wabisabi.Tests
 			};
 				
 			///////// <<<<<------- Coordinator
-			var sk = GenMACKey();
-			var iparams = ComputeIParams(sk);
+			var sk = GenMACKey();  					// ServerSecretParams
+			var iparams = ComputeIParams(sk);		// ServerPublicParams
 			var ireq = inputRegistrationRequest;
 			var attrs = ireq.Attributes;
 
@@ -188,11 +188,10 @@ namespace Wabisabi.Tests
 			var rc2 = RandomizedCommitments(z[2], Mv2, Ms2, ires.Credentials[2]);
 			var rc3 = RandomizedCommitments(z[3], Mv3, Ms3, ires.Credentials[3]);
 
-			var ProofKnowledgeMAC = ProofGeneratorFor(ires.iParams.I);
-			var pmac0 = ProofKnowledgeMAC(z[0]);
-			var pmac1 = ProofKnowledgeMAC(z[1]);
-			var pmac2 = ProofKnowledgeMAC(z[2]);
-			var pmac3 = ProofKnowledgeMAC(z[3]);
+			var pmac0 = ProofKnowledgeMAC(z[0], iparams.I);
+			var pmac1 = ProofKnowledgeMAC(z[1], iparams.I);
+			var pmac2 = ProofKnowledgeMAC(z[2], iparams.I);
+			var pmac3 = ProofKnowledgeMAC(z[3], iparams.I);
 
 			var outputRegistrationRequest = new {
 				ValidCredentialProof = new [] {
@@ -215,10 +214,10 @@ namespace Wabisabi.Tests
 			var Z3 = VerifyCredential(sk, oreq.ValidCredentialProof[3]);
 
 			// Check Bob has valid credentials
-			Assert.Equal(c0.Proof, Z0);
-			Assert.Equal(c1.Proof, Z1);
-			Assert.Equal(c2.Proof, Z2);
-			Assert.Equal(c3.Proof, Z3);
+			Assert.True(VerifyZeroKnowledgeProof(Z0, c0.Proof, iparams.I));
+			Assert.True(VerifyZeroKnowledgeProof(Z1, c1.Proof, iparams.I));
+			Assert.True(VerifyZeroKnowledgeProof(Z2, c2.Proof, iparams.I));
+			Assert.True(VerifyZeroKnowledgeProof(Z3, c3.Proof, iparams.I));
 
 			// Check over-spending 
 
@@ -232,7 +231,7 @@ namespace Wabisabi.Tests
 
 		private GroupElement VerifyCredential(
 			(Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk,
-			(GroupElement Cx0, GroupElement Cx1, GroupElement CV, GroupElement Cv, GroupElement Cs, GroupElement _) c)
+			(GroupElement Cx0, GroupElement Cx1, GroupElement CV, GroupElement Cv, GroupElement Cs, (GroupElement R,  Scalar s) proof) c)
 			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0)  + (sk.x1 * c.Cx1)  + (sk.yv * c.Cv)  + (sk.ys * c.Cs)).Negate();
 
         private static Scalar[] GenerateRandomNumbers(int n)

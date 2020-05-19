@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Security.Cryptography;
 using NBitcoin.Secp256k1;
 
 namespace Wabisabi
@@ -15,6 +16,9 @@ namespace Wabisabi
 		public static Func<Scalar, GroupElement> WithRandomFactor(Func<Scalar, Scalar, GroupElement> PedersenCommitmentFunction)
 			=> (Scalar a) => PedersenCommitmentFunction(Crypto.RandomScalar(), a);
 
+		public static (GroupElement, Scalar) ProofKnowledgeMAC(Scalar z, GroupElement GG)
+			=> CreateZeroKnowledgeProof(z, GG);
+
 		public static (GroupElement Cv, GroupElement Cs, GroupElement Cx0, GroupElement Cx1, GroupElement CV)  RandomizedCommitments(Scalar z, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) credential)
 			=> (Randomize(z, Generators.Gv, Mv),
 				Randomize(z, Generators.Gs, Ms),
@@ -22,14 +26,8 @@ namespace Wabisabi
 				Randomize(z, Generators.Gx1, credential.t * credential.U),
 				Randomize(z, Generators.GV, credential.V));
 
-		public static Func<Scalar, GroupElement> ProofGeneratorFor(GroupElement I)
-			=> (Scalar z) => ProofMAC(z, I);
-
 		private static GroupElement Randomize(Scalar z, GroupElement G, GroupElement H)
 			=> ComputePedersenCommitment(z, Scalar.One, G, H);
-
-		private static GroupElement ProofMAC(Scalar z, GroupElement I)
-			=> (z * I);
 
 		private static GroupElement ComputePedersenCommitment(Scalar a, Scalar x, GroupElement G, GroupElement H)
 			=> (a * G) + (x * H);
@@ -66,6 +64,35 @@ namespace Wabisabi
 			=> MAC(sk, Mv, Ms, mac.t, mac.U) == mac;
 
 		#endregion Wabisabi MAC functions
+
+		#region Proof
+
+		public static (GroupElement R, Scalar s) CreateZeroKnowledgeProof(Scalar sk, GroupElement GG)
+		{
+			var r = RandomScalar();
+			var R = r * GG;
+//			var R = r * Generators.G;
+
+			using var sha256 = SHA256Managed.Create();
+			var e = new Scalar(sha256.ComputeHash(R.ToByteArray()));
+ 
+			var s = r + sk * e;
+			return (R, s);
+		}
+
+		public static bool VerifyZeroKnowledgeProof(GroupElement P, (GroupElement R, Scalar s) sig, GroupElement GG)
+		{
+			using var sha256 = SHA256Managed.Create();
+			var e = new Scalar(sha256.ComputeHash(sig.R.ToByteArray()));
+
+			var gs = sig.s * GG;
+//			var gs = sig.s * Generators.G;
+			var xx = sig.R + e * P; 
+
+			return gs == xx;
+		}
+
+		#endregion Proof (Schnorr signatures)
 
 		#region Parameters
 		
