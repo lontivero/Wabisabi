@@ -15,8 +15,24 @@ namespace Wabisabi
 		public static Func<Scalar, GroupElement> WithRandomFactor(Func<Scalar, Scalar, GroupElement> PedersenCommitmentFunction)
 			=> (Scalar a) => PedersenCommitmentFunction(Crypto.RandomScalar(), a);
 
-		private static GroupElement ComputePedersenCommitment(Scalar x, Scalar a, GroupElement G, GroupElement H)
-			=> (x * G) + (a * H);
+		public static (GroupElement Cv, GroupElement Cs, GroupElement Cx0, GroupElement Cx1, GroupElement CV)  RandomizedCommitments(Scalar z, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) credential)
+			=> (Randomize(z, Generators.Gv, Mv),
+				Randomize(z, Generators.Gs, Ms),
+				Randomize(z, Generators.Gx0, credential.U),
+				Randomize(z, Generators.Gx1, credential.t * credential.U),
+				Randomize(z, Generators.GV, credential.V));
+
+		public static Func<Scalar, GroupElement> ProofGeneratorFor(GroupElement I)
+			=> (Scalar z) => ProofMAC(z, I);
+
+		private static GroupElement Randomize(Scalar z, GroupElement G, GroupElement H)
+			=> ComputePedersenCommitment(z, Scalar.One, G, H);
+
+		private static GroupElement ProofMAC(Scalar z, GroupElement I)
+			=> (z * I);
+
+		private static GroupElement ComputePedersenCommitment(Scalar a, Scalar x, GroupElement G, GroupElement H)
+			=> (a * G) + (x * H);
 
 		#endregion Pedersen Commitment Scheme functions
 
