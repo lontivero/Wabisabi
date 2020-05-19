@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using NBitcoin.Secp256k1;
 using Xunit;
@@ -145,7 +146,7 @@ namespace Wabisabi.Tests
 					( Mv3, Ms3 )
 				},
 				RangeProofs = new byte[0],
-				SumProofs = Sum(r)
+				ProofSum = Sum(r)
 			};
 				
 			///////// <<<<<------- Coordinator
@@ -155,8 +156,8 @@ namespace Wabisabi.Tests
 			var attrs = ireq.Attributes;
 
 			// Checks the amounts
-			var sumAmountCommitment = attrs.Select(x => x.Mv).Aggregate((Mvi, Mvj) => Mvi + Mvj);
-			var CommitmentSumAmount = Commit(ireq.Amount, ireq.SumProofs);
+			var sumAmountCommitment = Sum(attrs.Select(x => x.Mv));
+			var CommitmentSumAmount = Commit(ireq.Amount, ireq.ProofSum);
 			Assert.Equal(sumAmountCommitment, CommitmentSumAmount);
 
 			// Checks the amount ranges..... coming soon
@@ -193,7 +194,7 @@ namespace Wabisabi.Tests
 			var pmac3 = ProofKnowledgeMAC(z[3]);
 
 			var outputRegistrationRequest = new {
-				XX = new [] {
+				ValidCredentialProof = new [] {
 					(rc0.Cx0, rc0.Cx1, rc0.CV, rc0.Cv, rc0.Cs, Proof: pmac0),
 					(rc1.Cx0, rc1.Cx1, rc1.CV, rc1.Cv, rc1.Cs, Proof: pmac1),
 					(rc2.Cx0, rc2.Cx1, rc2.CV, rc2.Cv, rc2.Cs, Proof: pmac2),
@@ -206,11 +207,11 @@ namespace Wabisabi.Tests
 			///////// <<<<<------- Coordinator
 			var oreq = outputRegistrationRequest;
 
-			var (c0, c1, c2, c3) = (oreq.XX[0], oreq.XX[1], oreq.XX[2], oreq.XX[3]);
-			var Z0 = c0.CV + ((sk.w * Generators.Gw) + (sk.x0 * c0.Cx0)  + (sk.x1 * c0.Cx1)  + (sk.yv * c0.Cv)  + (sk.ys * c0.Cs)).Negate(); // create a function for this
-			var Z1 = c1.CV + ((sk.w * Generators.Gw) + (sk.x0 * c1.Cx0)  + (sk.x1 * c1.Cx1)  + (sk.yv * c1.Cv)  + (sk.ys * c1.Cs)).Negate();
-			var Z2 = c2.CV + ((sk.w * Generators.Gw) + (sk.x0 * c2.Cx0)  + (sk.x1 * c2.Cx1)  + (sk.yv * c2.Cv)  + (sk.ys * c2.Cs)).Negate();
-			var Z3 = c3.CV + ((sk.w * Generators.Gw) + (sk.x0 * c3.Cx0)  + (sk.x1 * c3.Cx1)  + (sk.yv * c3.Cv)  + (sk.ys * c3.Cs)).Negate();
+			var (c0, c1, c2, c3) = (oreq.ValidCredentialProof[0], oreq.ValidCredentialProof[1], oreq.ValidCredentialProof[2], oreq.ValidCredentialProof[3]);
+			var Z0 = VerifyCredential(sk, oreq.ValidCredentialProof[0]);
+			var Z1 = VerifyCredential(sk, oreq.ValidCredentialProof[1]);
+			var Z2 = VerifyCredential(sk, oreq.ValidCredentialProof[2]);
+			var Z3 = VerifyCredential(sk, oreq.ValidCredentialProof[3]);
 
 			// Check Bob has valid credentials
 			Assert.Equal(c0.Proof, Z0);
@@ -220,17 +221,20 @@ namespace Wabisabi.Tests
 
 			// Check over-spending 
 
-			var sumAmountCommitment2 = c0.Cv + c1.Cv + c2.Cv + c3.Cv;
+			var sumAmountCommitment2 = Sum(c0.Cv, c1.Cv, c2.Cv, c3.Cv);
 
 			var commitmentSumAmount2 = oreq.OverSpendingPreventionProof.SumZ * Generators.Gv 
 									 + Commit(oreq.VOut, oreq.OverSpendingPreventionProof.SumR);
 
-
 			Assert.Equal(sumAmountCommitment2, commitmentSumAmount2);
 		}
 
+		private GroupElement VerifyCredential(
+			(Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk,
+			(GroupElement Cx0, GroupElement Cx1, GroupElement CV, GroupElement Cv, GroupElement Cs, GroupElement _) c)
+			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0)  + (sk.x1 * c.Cx1)  + (sk.yv * c.Cv)  + (sk.ys * c.Cs)).Negate();
 
-		private static Scalar[] GenerateRandomNumbers(int n)
+        private static Scalar[] GenerateRandomNumbers(int n)
 			=> Enumerable.Range(0, n).Select(_=> RandomScalar()).ToArray();
 
 		private static Scalar RandomScalarForValue()
@@ -241,6 +245,12 @@ namespace Wabisabi.Tests
 		}
 
 		private static Scalar Sum(Scalar[] me)
+			=> me.Aggregate((s1, s2) => s1 + s2);
+
+		private static GroupElement Sum(IEnumerable<GroupElement> me)
+			=>Sum(me.ToArray());
+
+		private static GroupElement Sum(params GroupElement[] me)
 			=> me.Aggregate((s1, s2) => s1 + s2);
 	}
 }
