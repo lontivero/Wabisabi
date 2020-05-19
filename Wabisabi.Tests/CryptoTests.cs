@@ -122,7 +122,7 @@ namespace Wabisabi.Tests
 		{
 			///////// ALICE ------------>>>>>
 			// Alice wants to participate with one coin of 5_200_000 satoshies and get 
-			// (2 x 2_000_000) + (1 x 1_000_000) + (1 x 200_000)
+			// (2 x 2_000_000) + (1 x 1_000_000) + (1 x 200_000) but in this example we will finally register only one output 
 			var r = GenerateRandomNumbers(4);
 			var s = GenerateRandomNumbers(4);
 			var Mv0 = Commit(new Scalar(2_000_000), r[0]);
@@ -145,7 +145,7 @@ namespace Wabisabi.Tests
 					( Mv2, Ms2 ),
 					( Mv3, Ms3 )
 				},
-				RangeProofs = new byte[0],
+				RangeProofs = new byte[0],  // not implemented yet
 				ProofSum = Sum(r)
 			};
 				
@@ -167,6 +167,7 @@ namespace Wabisabi.Tests
 			var credential2 = MAC(sk, attrs[2].Mv, attrs[2].Ms);
 			var credential3 = MAC(sk, attrs[3].Mv, attrs[3].Ms);
 
+			// This is what the coordinator responds to the client.
 			var inputRegistrationResponse = new {
 				iParams = iparams,
 				Credentials = new[]{
@@ -179,7 +180,7 @@ namespace Wabisabi.Tests
 
 
 			///////// Bob ------------>>>>>
-			// Receives the credentials and
+			// Receives the credentials and randomizes the commitments
 			var ires = inputRegistrationResponse;  
 			var z = GenerateRandomNumbers(4);
 			var rc0 = RandomizedCommitments(z[0], Mv0, Ms0, ires.Credentials[0]);
@@ -195,7 +196,7 @@ namespace Wabisabi.Tests
 
 			var outputRegistrationRequest = new {
 				ValidCredentialProof = new [] {
-					(rc0.Cx0, rc0.Cx1, rc0.CV, rc0.Cv, rc0.Cs, Proof: pmac0),
+					(rc0.Cx0, rc0.Cx1, rc0.CV, rc0.Cv, rc0.Cs, Proof: pmac0),  // how should I call these records? ValidCredentialProof?
 					(rc1.Cx0, rc1.Cx1, rc1.CV, rc1.Cv, rc1.Cs, Proof: pmac1),
 					(rc2.Cx0, rc2.Cx1, rc2.CV, rc2.Cv, rc2.Cs, Proof: pmac2),
 					(rc3.Cx0, rc3.Cx1, rc3.CV, rc3.Cv, rc3.Cs, Proof: pmac3)
