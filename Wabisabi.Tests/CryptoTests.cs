@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using NBitcoin.Secp256k1;
 using Xunit;
 using static Wabisabi.Crypto;
@@ -95,25 +96,22 @@ namespace Wabisabi.Tests
 			var r = Enumerable.Range(1, k).Select(i => RandomScalar()).ToArray();
 			var Mv = Enumerable.Range(0, k).Select(i => Commit(v[i], r[i])).ToArray();
 
-			var v_sum = v.Aggregate((vi, vj)=> vi + vj);
-			var r_sum = r.Aggregate((ri, rj)=> ri + rj);
-			var Pi_Mv = Mv.Aggregate((Mvi, Mvj) => Mvi + Mvj);
-			var C = Commit(v_sum, r_sum);
-
-			Assert.True(C == Pi_Mv);
+			Assert.Equal(Commit(Sum(v), Sum(r)), Sum(Mv));
 		}
 
 		[Fact]
 		public void CanProduceAndVerifyMAC()
 		{
-			var sk = GenMACKey();
+			var sk = GenServerSecretKey();
 			var Mv = Commit(new Scalar( 21_000_000), RandomScalar());
 			var Ms = Commit(Crypto.RandomScalar(), Crypto.RandomScalar());
+			var attribute = new Attribute(Mv, Ms);
+			var commutedAttribute = new Attribute(Ms, Mv);
 
-			var mac = MAC(sk, Mv, Ms);
+			var mac = ComputeMAC(sk, attribute);
 
-			Assert.True(VerifyMAC(sk, Mv, Ms, mac));
-			Assert.False(VerifyMAC(sk, Ms, Mv, mac));
+			Assert.True(VerifyMAC(sk, attribute, mac));
+			Assert.False(VerifyMAC(sk, commutedAttribute, mac));
 		}
 
 
@@ -137,21 +135,23 @@ namespace Wabisabi.Tests
 			var Ms3 = Commit(serialNumbers[3], s[3]);
 
 			// this is what we send to the coordinator
+			var attributes = new[] { 
+				new Attribute( Mv0, Ms0 ),
+				new Attribute( Mv1, Ms1 ),
+				new Attribute( Mv2, Ms2 ),
+				new Attribute( Mv3, Ms3 )
+			};
+
 			var inputRegistrationRequest = new { 
 				Amount = new Scalar(5_200_000),
-				Attributes = new (GroupElement Mv, GroupElement Ms)[]{ 
-					( Mv0, Ms0 ),
-					( Mv1, Ms1 ),
-					( Mv2, Ms2 ),
-					( Mv3, Ms3 )
-				},
+				Attributes = attributes,
 				RangeProofs = new byte[0],  // not implemented yet
 				ProofSum = Sum(r)
 			};
 				
 			///////// <<<<<------- Coordinator
-			var sk = GenMACKey();  					// ServerSecretParams
-			var iparams = ComputeIParams(sk);		// ServerPublicParams
+			var sk = GenServerSecretKey();  			// ServerSecretParams
+			var iparams = ComputeServerPublicKey(sk);	// ServerPublicParams
 			var ireq = inputRegistrationRequest;
 			var attrs = ireq.Attributes;
 
@@ -162,10 +162,12 @@ namespace Wabisabi.Tests
 
 			// Checks the amount ranges..... coming soon
 
-			var credential0 = MAC(sk, attrs[0].Mv, attrs[0].Ms);
-			var credential1 = MAC(sk, attrs[1].Mv, attrs[1].Ms);
-			var credential2 = MAC(sk, attrs[2].Mv, attrs[2].Ms);
-			var credential3 = MAC(sk, attrs[3].Mv, attrs[3].Ms);
+			// We must generate the proof of knowledge of the secret key here
+
+			var credential0 = ComputeMAC(sk, attrs[0]);
+			var credential1 = ComputeMAC(sk, attrs[1]);
+			var credential2 = ComputeMAC(sk, attrs[2]);
+			var credential3 = ComputeMAC(sk, attrs[3]);
 
 			// This is what the coordinator responds to the client.
 			var inputRegistrationResponse = new {
@@ -183,58 +185,53 @@ namespace Wabisabi.Tests
 			// Receives the credentials and randomizes the commitments
 			var ires = inputRegistrationResponse;  
 			var z = GenerateRandomNumbers(4);
-			var rc0 = RandomizedCommitments(z[0], Mv0, Ms0, ires.Credentials[0]);
-			var rc1 = RandomizedCommitments(z[1], Mv1, Ms1, ires.Credentials[1]);
-			var rc2 = RandomizedCommitments(z[2], Mv2, Ms2, ires.Credentials[2]);
-			var rc3 = RandomizedCommitments(z[3], Mv3, Ms3, ires.Credentials[3]);
+			var rc0 = RandomizeCommitments(z[0], attributes[0], ires.Credentials[0]);
+			var rc1 = RandomizeCommitments(z[1], attributes[1], ires.Credentials[1]);
+			var rc2 = RandomizeCommitments(z[2], attributes[2], ires.Credentials[2]);
+			var rc3 = RandomizeCommitments(z[3], attributes[3], ires.Credentials[3]);
 
-			var pmac0 = ProofKnowledgeMAC(z[0], iparams.I);
-			var pmac1 = ProofKnowledgeMAC(z[1], iparams.I);
-			var pmac2 = ProofKnowledgeMAC(z[2], iparams.I);
-			var pmac3 = ProofKnowledgeMAC(z[3], iparams.I);
+			var pkMAC0 = ProofOfKnowledgeMAC(z[0], ires.Credentials[0].t, iparams.I, rc0.Cx0);
+			var pkMAC1 = ProofOfKnowledgeMAC(z[1], ires.Credentials[1].t, iparams.I, rc1.Cx0);
+			var pkMAC2 = ProofOfKnowledgeMAC(z[2], ires.Credentials[2].t, iparams.I, rc2.Cx0);
+			var pkMAC3 = ProofOfKnowledgeMAC(z[3], ires.Credentials[3].t, iparams.I, rc3.Cx0);
 
 			var outputRegistrationRequest = new {
 				ValidCredentialProof = new [] {
-					(rc0.Cx0, rc0.Cx1, rc0.CV, rc0.Cv, rc0.Cs, Proof: pmac0),  // how should I call these records? ValidCredentialProof?
-					(rc1.Cx0, rc1.Cx1, rc1.CV, rc1.Cv, rc1.Cs, Proof: pmac1),
-					(rc2.Cx0, rc2.Cx1, rc2.CV, rc2.Cv, rc2.Cs, Proof: pmac2),
-					(rc3.Cx0, rc3.Cx1, rc3.CV, rc3.Cv, rc3.Cs, Proof: pmac3)
+					(RandomizedCredential: rc0, Proof: pkMAC0),  // how should I call these records? ValidCredentialProof?
+					(RandomizedCredential: rc1, Proof: pkMAC1),
+					(RandomizedCredential: rc2, Proof: pkMAC2),
+					(RandomizedCredential: rc3, Proof: pkMAC3)
 				},
 				OverSpendingPreventionProof = (SumZ: Sum(z), SumR: Sum(r) ),
-				VOut = new Scalar(5_200_000)
+				OutputValue = new Scalar(5_200_000)
 			};
 
 			///////// <<<<<------- Coordinator
 			var oreq = outputRegistrationRequest;
 
 			var (c0, c1, c2, c3) = (oreq.ValidCredentialProof[0], oreq.ValidCredentialProof[1], oreq.ValidCredentialProof[2], oreq.ValidCredentialProof[3]);
-			var Z0 = VerifyCredential(sk, oreq.ValidCredentialProof[0]);
-			var Z1 = VerifyCredential(sk, oreq.ValidCredentialProof[1]);
-			var Z2 = VerifyCredential(sk, oreq.ValidCredentialProof[2]);
-			var Z3 = VerifyCredential(sk, oreq.ValidCredentialProof[3]);
+			var Z0 = VerifyCredential(sk, c0.RandomizedCredential);
+			var Z1 = VerifyCredential(sk, c1.RandomizedCredential);
+			var Z2 = VerifyCredential(sk, c2.RandomizedCredential);
+			var Z3 = VerifyCredential(sk, c3.RandomizedCredential);
 
 			// Check Bob has valid credentials
-			Assert.True(VerifyZeroKnowledgeProof(Z0, c0.Proof, iparams.I));
-			Assert.True(VerifyZeroKnowledgeProof(Z1, c1.Proof, iparams.I));
-			Assert.True(VerifyZeroKnowledgeProof(Z2, c2.Proof, iparams.I));
-			Assert.True(VerifyZeroKnowledgeProof(Z3, c3.Proof, iparams.I));
+
+			Assert.True(VerifyZeroKnowledgeProofMAC(Z0, c0.RandomizedCredential.Cx1, iparams.I, c0.RandomizedCredential.Cx0, c0.Proof));
+			Assert.True(VerifyZeroKnowledgeProofMAC(Z1, c1.RandomizedCredential.Cx1, iparams.I, c1.RandomizedCredential.Cx0, c1.Proof));
+			Assert.True(VerifyZeroKnowledgeProofMAC(Z2, c2.RandomizedCredential.Cx1, iparams.I, c2.RandomizedCredential.Cx0, c2.Proof));
+			Assert.True(VerifyZeroKnowledgeProofMAC(Z3, c3.RandomizedCredential.Cx1, iparams.I, c3.RandomizedCredential.Cx0, c3.Proof));
 
 			// Check over-spending 
 
-			var sumAmountCommitment2 = Sum(c0.Cv, c1.Cv, c2.Cv, c3.Cv);
-
-			var commitmentSumAmount2 = oreq.OverSpendingPreventionProof.SumZ * Generators.Gv 
-									 + Commit(oreq.VOut, oreq.OverSpendingPreventionProof.SumR);
+			var sumAmountCommitment2 = Sum(c0.RandomizedCredential.Cv, c1.RandomizedCredential.Cv, c2.RandomizedCredential.Cv, c3.RandomizedCredential.Cv);
+			var commitmentSumAmount2 = Sum(oreq.OverSpendingPreventionProof.SumZ * Generators.Gv, oreq.OutputValue * Generators.Gg, oreq.OverSpendingPreventionProof.SumR * Generators.Gh);
 
 			Assert.Equal(sumAmountCommitment2, commitmentSumAmount2);
 		}
 
-		private GroupElement VerifyCredential(
-			(Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys) sk,
-			(GroupElement Cx0, GroupElement Cx1, GroupElement CV, GroupElement Cv, GroupElement Cs, (GroupElement R,  Scalar s) proof) c)
-			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0)  + (sk.x1 * c.Cx1)  + (sk.yv * c.Cv)  + (sk.ys * c.Cs)).Negate();
 
-        private static Scalar[] GenerateRandomNumbers(int n)
+		private static Scalar[] GenerateRandomNumbers(int n)
 			=> Enumerable.Range(0, n).Select(_=> RandomScalar()).ToArray();
 
 		private static Scalar RandomScalarForValue()
@@ -243,14 +240,5 @@ namespace Wabisabi.Tests
 			ret.ShrInt(26, out ret);
 			return ret;
 		}
-
-		private static Scalar Sum(Scalar[] me)
-			=> me.Aggregate((s1, s2) => s1 + s2);
-
-		private static GroupElement Sum(IEnumerable<GroupElement> me)
-			=>Sum(me.ToArray());
-
-		private static GroupElement Sum(params GroupElement[] me)
-			=> me.Aggregate((s1, s2) => s1 + s2);
 	}
 }
