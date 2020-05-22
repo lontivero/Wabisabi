@@ -34,23 +34,38 @@ Assert.True(OpenCommit(C10 + C35, new Scalar(45),  cr1 + cr2));
 
 ```c#
 // Generates a secret key sk for MAC generations
-(Scalar x0, Scalar x1, Scalar y0, Scalar y1) GenMACKey()
+ServerSecretKey GenServerSecretKey()
 
 // Computes a MAC for Mv and Ms using the secret key sk 
-(Scalar t, GroupElement U, GroupElement V) MAC((Scalar x0, Scalar x1, Scalar y0, Scalar y1) sk, GroupElement Mv, GroupElement Ms)
+MAC ComputeMAC(ServerSecretKey sk, Attribute attr)
 
 // Verifies the 
-bool VerifyMAC((Scalar, Scalar, Scalar, Scalar) sk, GroupElement Mv, GroupElement Ms, (Scalar t, GroupElement U, GroupElement V) mac)
+bool VerifyMAC(ServerSecretKey sk, Attribute attr, MAC mac)
 ```
+
+
 **Example:**
 
 ```c#
-var sk = GenMACKey();
-var Mv = Commit(new Scalar( 21_000_000), RandomScalar());
-var Ms = Commit(Crypto.RandomScalar(), Crypto.RandomScalar());
+var r = RandomScalar();
+var s = RandomScalar();
+var serialNumber = RandomScalar();
 
-var mac = MAC(sk, Mv, Ms);
+var inputValueCommitment = Commit(new Scalar(2_000_000), r);
+var serialNumberCommitment = Commit(serialNumber, s);
 
-Assert.True(VerifyMAC(sk, Mv, Ms, mac));
-Assert.False(VerifyMAC(sk, Ms, Mv, mac));
+var attribute = new Attribute(inputValueCommitment, serialNumberCommitment);
+
+var sk = GenServerSecretKey();
+var pk = ComputeServerPublicKey(sk);
+
+var credential = ComputeMAC(sk, attribute);
+
+var signingSecretKey = RandomScalar();
+var randComm = RandomizeCommitments(signingKey, attributes, credentials);
+var proofMAC = ProofOfKnowledgeMAC(signingKey, credential.t, pk.I, randComm.Cx0);
+
+var signingPublicKey = VerifyCredential(sk, randComm);
+
+Assert.True(VerifyZeroKnowledgeProofMAC(signingPublicKey, randComm.Cx1, pk.I, randComm.Cx0, proofMAC));
 ```
