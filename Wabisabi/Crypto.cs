@@ -30,10 +30,10 @@ namespace Wabisabi
 			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0) + (sk.x1 * c.Cx1) + (sk.yv * c.Cv)  + (sk.ys * c.Cs)).Negate();
 
 		private static GroupElement Randomize(Scalar z, GroupElement G, GroupElement H)
-			=> ComputePedersenCommitment(z, Scalar.One, G, H);
+			=> ComputePedersenCommitment(Scalar.One, z, G, H);
 
 		private static GroupElement ComputePedersenCommitment(Scalar a, Scalar x, GroupElement G, GroupElement H)
-			=> (a * G) + (x * H);
+			=> (x * G) + (a * H);
 
 		#endregion Pedersen Commitment Scheme functions
 
@@ -67,6 +67,22 @@ namespace Wabisabi
 		#endregion Wabisabi MAC functions
 
 		#region Proof
+
+		public static (GroupElement R, Scalar s) ProofOfExponent(Scalar sk, GroupElement G)
+		{
+			var r = RandomScalar();
+			var R = r * G;
+			var P = sk * G;
+			var e = BuildChallenge(R, G);
+			var s = r + sk * e;
+			return (R, s);
+		}
+
+		public static bool VerifyProofOfExponent(GroupElement P, (GroupElement R, Scalar s) sig, GroupElement G)
+		{
+			var e = BuildChallenge(sig.R, G);
+			return (sig.s * G) == (sig.R + e * P);
+		}
 
 		public static ProofOfMAC ProofOfKnowledgeMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
 		{
@@ -139,7 +155,10 @@ namespace Wabisabi
 		public static GroupElement Sum(params GroupElement[] me)
 			=> me.Aggregate((s1, s2) => s1 + s2);
 
-		private static Scalar BuildChallenge(params GroupElement[] GEs)
+		public static Scalar BuildChallenge( IEnumerable<GroupElement> GEs)
+			=> BuildChallenge(GEs.ToArray());
+
+		public static Scalar BuildChallenge(params GroupElement[] GEs)
 		{
 			var byteArrays = GEs.Select(x => x.ToByteArray());
 			var len = byteArrays.Sum(a => a.Length);
@@ -262,6 +281,36 @@ namespace Wabisabi
 		public GroupElement Cx0 { get; }
 		public GroupElement Cx1 { get; }
 		public GroupElement CV { get; }
+	}
+
+	public readonly struct Proof
+	{
+		public readonly IEnumerable<(GroupElement R, Scalar s)> Proofs { get; }
+
+		public Proof(IEnumerable<(GroupElement R, Scalar s)> proofs)
+		{
+			this.Proofs = proofs;
+		}
+	}
+
+	public readonly struct ProofOfSN
+	{
+		public ProofOfSN(GroupElement A, GroupElement B, GroupElement C, Scalar sa, Scalar sb, Scalar sc)
+		{
+			this.A = A;
+			this.B = B;
+			this.C = C;
+			this.sa = sa;
+			this.sb = sb;
+			this.sc = sc;
+		}
+
+		public GroupElement A { get; }
+		public GroupElement B { get; }
+		public GroupElement C { get; }
+		public Scalar sa { get; }
+		public Scalar sb { get; }
+		public Scalar sc { get; }
 	}
 
 	public readonly struct ProofOfMAC
