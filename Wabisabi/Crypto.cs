@@ -68,51 +68,56 @@ namespace Wabisabi
 
 		#region Proof
 
-		public static (GroupElement R, Scalar s) ProofOfExponent(Scalar sk, GroupElement G)
+		public static Proof ProofOfKnowledge(Scalar[] ws, GroupElement[] Gs)
 		{
-			var r = RandomScalar();
-			var R = r * G;
-			var P = sk * G;
-			var e = BuildChallenge(R, G);
-			var s = r + sk * e;
-			return (R, s);
+			var nonceKeys = new List<Scalar>();
+			var nonces = new List<GroupElement>();
+			foreach (var G in Gs)
+			{
+				var n = RandomScalar();
+				nonceKeys.Add(n);
+				nonces.Add(n * G);
+			}
+
+			var e = BuildChallenge(nonces.Concat(Gs));
+
+			var ss = new List<Scalar>();
+			foreach(var (nonceKey, witness) in Enumerable.Zip(nonceKeys, ws))
+			{
+				ss.Add(nonceKey + witness * e);
+			}
+			return new Proof (Enumerable.Zip(nonces, ss));
 		}
 
-		public static bool VerifyProofOfExponent(GroupElement P, (GroupElement R, Scalar s) sig, GroupElement G)
+		public static bool VerifyProofOfKnowledge(GroupElement[] Ps, GroupElement[] Gs, Proof proof)
 		{
-			var e = BuildChallenge(sig.R, G);
-			return (sig.s * G) == (sig.R + e * P);
+			var nonces = new List<GroupElement>();
+			foreach (var (pi, G) in Enumerable.Zip(proof.Proofs, Gs))
+			{
+				nonces.Add(pi.s * G);
+			}
+
+			var Rs = proof.Proofs.Select(p => p.R);
+			var e = BuildChallenge(Rs.Concat(Gs));
+
+			return Sum(nonces) == Sum(Rs) + Sum(Ps.Select(P => (e * P)));
 		}
 
-		public static ProofOfMAC ProofOfKnowledgeMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
-		{
-			var (r, a, b, c) = (RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
-			var R = r * I; 
-			var A = a * Cx0; 
-			var B = b * Generators.Gx0; 
-			var C = c * Generators.Gx1;
+		public static Proof ProofOfExponent(Scalar sk, GroupElement G)
+			=> ProofOfKnowledge(new[] { sk }, new[] { G });
 
-			var e = BuildChallenge(R, A, B, C, I, Cx0, Generators.Gx0, Generators.Gx1);
+		public static bool VerifyProofOfExponent(GroupElement P, GroupElement G, Proof proof)
+			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ G }, proof);
 
-			var sz = r + z * e;
-			var sa = a + t * e;
-			var sb = b + (z * t.Negate()) * e;
-			var sc = c + z * e;
-			return new ProofOfMAC (R, A, B, C, sz, sa, sb, sc);
-		}
-
-		public static bool VerifyZeroKnowledgeProofMAC(GroupElement Z, GroupElement Cx1, GroupElement I, GroupElement Cx0, ProofOfMAC proof)
-		{
-			var gsz = proof.sz * I;
-			var gsa = proof.sa * Cx0;
-			var gsb = proof.sb * Generators.Gx0;
-			var gsc = proof.sc * Generators.Gx1;
-
-			var e = BuildChallenge(proof.R, proof.A, proof.B, proof.C, I, Cx0, Generators.Gx0, Generators.Gx1);
-
-			return Sum(gsz, gsa, gsb, gsc) == Sum(proof.R, proof.A, proof.B, proof.C, (e * Cx1), (e * Z));
-		}
-
+		public static Proof ProofOfKnowledgeMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
+			=> ProofOfKnowledge(
+					new[]{ z, t, (z * t.Negate()), z}, 
+					new[] { I, Cx0, Generators.Gx0, Generators.Gx1});
+		public static bool VerifyProofKnowledgeMAC(GroupElement Z, GroupElement Cx1, GroupElement I, GroupElement Cx0, Proof proof)
+			=> VerifyProofOfKnowledge(
+				new[]{ Cx1, Z},
+				new[]{ I, Cx0, Generators.Gx0, Generators.Gx1}, 
+				proof);
 
 		#endregion Proof (Schnorr signatures)
 
@@ -291,48 +296,5 @@ namespace Wabisabi
 		{
 			this.Proofs = proofs;
 		}
-	}
-
-	public readonly struct ProofOfSN
-	{
-		public ProofOfSN(GroupElement A, GroupElement B, GroupElement C, Scalar sa, Scalar sb, Scalar sc)
-		{
-			this.A = A;
-			this.B = B;
-			this.C = C;
-			this.sa = sa;
-			this.sb = sb;
-			this.sc = sc;
-		}
-
-		public GroupElement A { get; }
-		public GroupElement B { get; }
-		public GroupElement C { get; }
-		public Scalar sa { get; }
-		public Scalar sb { get; }
-		public Scalar sc { get; }
-	}
-
-	public readonly struct ProofOfMAC
-	{
-		public ProofOfMAC(GroupElement R, GroupElement A, GroupElement B, GroupElement C, Scalar sz, Scalar sa, Scalar sb, Scalar sc)
-		{
-			this.R = R;
-			this.A = A;
-			this.B = B;
-			this.C = C;
-			this.sz = sz;
-			this.sa = sa;
-			this.sb = sb;
-			this.sc = sc;
-		}
-		public GroupElement R { get; }
-		public GroupElement A { get; }
-		public GroupElement B { get; }
-		public GroupElement C { get; }
-		public Scalar sz { get; }
-		public Scalar sa { get; }
-		public Scalar sb { get; }
-		public Scalar sc { get; }
 	}
 }

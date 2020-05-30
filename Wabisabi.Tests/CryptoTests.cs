@@ -174,10 +174,10 @@ namespace Wabisabi.Tests
 			var pkN = ireq.ProofOfNULL;
 
 			// Checks the proofs (amounts and range)
-			Assert.True(VerifyProofOfExponent(attrs[0].Mv, (pkN[0].R, pkN[0].s), Generators.Gg));
-			Assert.True(VerifyProofOfExponent(attrs[1].Mv, (pkN[1].R, pkN[1].s), Generators.Gg));
-			Assert.True(VerifyProofOfExponent(attrs[2].Mv, (pkN[2].R, pkN[2].s), Generators.Gg));
-			Assert.True(VerifyProofOfExponent(attrs[3].Mv, (pkN[3].R, pkN[3].s), Generators.Gg));
+			Assert.True(VerifyProofOfExponent(attrs[0].Mv, Generators.Gg, pkN[0]));
+			Assert.True(VerifyProofOfExponent(attrs[1].Mv, Generators.Gg, pkN[1]));
+			Assert.True(VerifyProofOfExponent(attrs[2].Mv, Generators.Gg, pkN[2]));
+			Assert.True(VerifyProofOfExponent(attrs[3].Mv, Generators.Gg, pkN[3]));
 
 			var sumAmountCommitment = Sum(attrs.Select(x => x.Mv));
 			var CommitmentSumAmount = Commit(ireq.Amount, ireq.ProofSum);
@@ -255,10 +255,10 @@ namespace Wabisabi.Tests
 			Assert.True(VerifyProofOfKnowledgeSN(c2.RandomizedCredential.Cs, c2.ProofOfSerialNumber));
 			Assert.True(VerifyProofOfKnowledgeSN(c3.RandomizedCredential.Cs, c3.ProofOfSerialNumber));
 
-			Assert.True(VerifyZeroKnowledgeProofMAC(Z0, c0.RandomizedCredential.Cx1, iparams.I, c0.RandomizedCredential.Cx0, c0.ProofOfMAC));
-			Assert.True(VerifyZeroKnowledgeProofMAC(Z1, c1.RandomizedCredential.Cx1, iparams.I, c1.RandomizedCredential.Cx0, c1.ProofOfMAC));
-			Assert.True(VerifyZeroKnowledgeProofMAC(Z2, c2.RandomizedCredential.Cx1, iparams.I, c2.RandomizedCredential.Cx0, c2.ProofOfMAC));
-			Assert.True(VerifyZeroKnowledgeProofMAC(Z3, c3.RandomizedCredential.Cx1, iparams.I, c3.RandomizedCredential.Cx0, c3.ProofOfMAC));
+			Assert.True(VerifyProofKnowledgeMAC(Z0, c0.RandomizedCredential.Cx1, iparams.I, c0.RandomizedCredential.Cx0, c0.ProofOfMAC));
+			Assert.True(VerifyProofKnowledgeMAC(Z1, c1.RandomizedCredential.Cx1, iparams.I, c1.RandomizedCredential.Cx0, c1.ProofOfMAC));
+			Assert.True(VerifyProofKnowledgeMAC(Z2, c2.RandomizedCredential.Cx1, iparams.I, c2.RandomizedCredential.Cx0, c2.ProofOfMAC));
+			Assert.True(VerifyProofKnowledgeMAC(Z3, c3.RandomizedCredential.Cx1, iparams.I, c3.RandomizedCredential.Cx0, c3.ProofOfMAC));
 
 
 			// Check over-spending 
@@ -268,40 +268,13 @@ namespace Wabisabi.Tests
 			Assert.Equal(sumAmountCommitment2, commitmentSumAmount2);
 		}
 
-		private Proof ProofOfKnowledge(Scalar[] ws, GroupElement[] Gs)
-		{
-			var nonceKeys = new List<Scalar>();
-			var nonces = new List<GroupElement>();
-			foreach (var G in Gs)
-			{
-				var n = RandomScalar();
-				nonceKeys.Add(n);
-				nonces.Add(n * G);
-			}
 
-			var e = BuildChallenge(nonces.Concat(Gs));
+		private static Proof ProofOfKnowledgeSN(Scalar z, Scalar r, Scalar s)
+			=> ProofOfKnowledge(new[]{ z, r, s}, new[]{Generators.Gg, Generators.Gh, Generators.Gs} );
 
-			var ss = new List<Scalar>();
-			foreach(var (nonceKey, witness) in Enumerable.Zip(nonceKeys, ws))
-			{
-				ss.Add(nonceKey + witness * e);
-			}
-			return new Proof (Enumerable.Zip(nonces, ss));
-		}
-
-		private static bool VerifyProofOfKnowledge(GroupElement[] Ps, GroupElement[] Gs, Proof proof)
-		{
-			var nonces = new List<GroupElement>();
-			foreach (var (pi, G) in Enumerable.Zip(proof.Proofs, Gs))
-			{
-				nonces.Add(pi.s * G);
-			}
-
-			var e = BuildChallenge(nonces.Concat(Gs));
-
-			return Sum(nonces) == Sum(proof.Proofs.Select(p => p.R)) + Sum(Ps.Select(P => (e * P)));
-		}
-
+		public static bool VerifyProofOfKnowledgeSN(GroupElement Cs, Proof proof)
+			=> VerifyProofOfKnowledge(new[] { Cs }, new[]{Generators.Gg, Generators.Gh, Generators.Gs}, proof);
+/*
 		private ProofOfSN ProofOfKnowledgeSN(Scalar z, Scalar r, Scalar s)
 		{
 			var (a, b, c) = (RandomScalar(), RandomScalar(), RandomScalar());
@@ -327,7 +300,7 @@ namespace Wabisabi.Tests
 
 			return Sum(gsa, gsb, gsc) == Sum(proof.A, proof.B, proof.C, (e * Cs));
 		}
-
+*/
 
 		private static Scalar[] GenerateRandomNumbers(int n)
 			=> Enumerable.Range(0, n).Select(_=> RandomScalar()).ToArray();
