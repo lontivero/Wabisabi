@@ -109,14 +109,25 @@ namespace Wabisabi
 		public static bool VerifyProofOfExponent(GroupElement P, GroupElement G, Proof proof)
 			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ G }, proof);
 
-		public static Proof ProofOfKnowledgeMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
+		public static Proof ProofOfMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
 			=> ProofOfKnowledge(
-					new[]{ z, t, (z * t.Negate()), z}, 
+					new[] { z, t, (z * t.Negate()), z}, 
 					new[] { I, Cx0, Generators.Gx0, Generators.Gx1});
-		public static bool VerifyProofKnowledgeMAC(GroupElement Z, GroupElement Cx1, GroupElement I, GroupElement Cx0, Proof proof)
+		public static bool VerifyProofOfMAC(GroupElement Z, GroupElement Cx1, GroupElement I, GroupElement Cx0, Proof proof)
 			=> VerifyProofOfKnowledge(
-				new[]{ Cx1, Z},
-				new[]{ I, Cx0, Generators.Gx0, Generators.Gx1}, 
+					new[]{ Cx1, Z},
+					new[]{ I, Cx0, Generators.Gx0, Generators.Gx1}, 
+					proof);
+
+		public static Proof ProofOfSerialNumber(Scalar z, Scalar r, Scalar s)
+			=> ProofOfKnowledge(
+				new[] { z, r, s},
+				new[] {Generators.Gs, Generators.Gh, Generators.Gg} );
+
+		public static bool VerifyProofOfSerialNumber(GroupElement Cs, Proof proof)
+			=> VerifyProofOfKnowledge(
+				new[] { Cs }, 
+				new[] {Generators.Gs, Generators.Gh, Generators.Gg}, 
 				proof);
 
 		#endregion Proof (Schnorr signatures)
@@ -126,8 +137,8 @@ namespace Wabisabi
 		public static ServerSecretKey GenServerSecretKey()
 			=> new ServerSecretKey(RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
 
-		public static (GroupElement Cw, GroupElement I) ComputeServerPublicKey(ServerSecretKey sk)
-			=> ((sk.w * Generators.Gw + sk.wp * Generators.Gwp),
+		public static ServerPublicKey ComputeServerPublicKey(ServerSecretKey sk)
+			=> new ServerPublicKey((sk.w * Generators.Gw + sk.wp * Generators.Gwp),
 				(sk.x0.Negate() * Generators.Gx0) + 
 				(sk.x1.Negate() * Generators.Gx1) + 
 				(sk.yv.Negate() * Generators.Gv ) + 
@@ -180,26 +191,6 @@ namespace Wabisabi
 		}
 
 		#endregion Utils
-
-		#if false  //unused
-
-		public static (GroupElement, Scalar) ProofOfExponent(Scalar z, GroupElement GG)
-			=> CreateZeroKnowledgeProof(z, GG);
-
-		public static (GroupElement R, Scalar s) CreateZeroKnowledgeProof(Scalar sk, GroupElement GG)
-		{
-			var r = RandomScalar();
-			var R = r * GG;
-
-			using var sha256 = SHA256Managed.Create();
-			var e = new Scalar(sha256.ComputeHash(R.ToByteArray()));
- 
-			var s = r + sk * e;
-			return (R, s);
-		}
-
-		#endif
-
 	}
 
 	public readonly struct Attribute 
@@ -232,6 +223,18 @@ namespace Wabisabi
 		public Scalar x1 { get; }
 		public Scalar yv { get; }
 		public Scalar ys { get; }
+	}
+
+	public readonly struct ServerPublicKey
+	{
+		public ServerPublicKey(GroupElement Cw, GroupElement I)
+		{
+			this.Cw = Cw;
+			this.I = I;
+		}
+
+		public GroupElement Cw { get; }
+		public GroupElement I { get; }
 	}
 
 	public readonly struct MAC
