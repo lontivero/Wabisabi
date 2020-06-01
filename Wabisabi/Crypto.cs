@@ -130,6 +130,26 @@ namespace Wabisabi
 				new[] {Generators.Gs, Generators.Gh, Generators.Gg}, 
 				proof);
 
+		public static Proof ProofOfParams(ServerSecretKey sk, Attribute att, GroupElement U, Scalar t)
+			=> ProofOfKnowledge(
+				new[] { 
+					sk.w, sk.wp, 
+					Scalar.One, sk.x0, sk.x1, sk.yv, sk.ys,
+					sk.w, sk.x0 + (sk.x1 * t), sk.yv, sk.ys},
+				new[] { 
+					Generators.Gw, Generators.Gwp, 
+					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
+					Generators.Gw, U, att.Mv, att.Ms });
+
+		public static bool VerifyProofOfParams(GroupElement Cw, GroupElement I, GroupElement U, GroupElement V, Attribute att, Proof proof)
+			=> VerifyProofOfKnowledge(
+				new[] { Cw, I, V},
+				new[] {
+					Generators.Gw, Generators.Gwp, 
+					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
+					Generators.Gw, U, att.Mv, att.Ms },
+				proof);
+
 		#endregion Proof (Schnorr signatures)
 
 		#region Parameters
@@ -162,7 +182,7 @@ namespace Wabisabi
 			return ret;
 		}
 
-		public static Scalar Sum(Scalar[] me)
+		public static Scalar Sum(params Scalar[] me)
 			=> me.Aggregate((s1, s2) => s1 + s2);
 
 		public static GroupElement Sum(IEnumerable<GroupElement> me)

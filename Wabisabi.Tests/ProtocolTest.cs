@@ -14,81 +14,95 @@ namespace Wabisabi.Tests
 			//
 			// ALICE 
 			// _______________________________________________________________________________________ 
-			var r = GenerateRandomNumbers(4);
-			var s = GenerateRandomNumbers(4);
+			var (r0, (r1, (r2, (r3, _)))) = GenerateRandomNumbers(4);
 
-			var Mv0 = Commit(Scalar.Zero, r[0]);
-			var Mv1 = Commit(Scalar.Zero, r[1]);
-			var Mv2 = Commit(Scalar.Zero, r[2]);
-			var Mv3 = Commit(Scalar.Zero, r[3]);
+			var Mv0 = Commit(Scalar.Zero, r0);
+			var Mv1 = Commit(Scalar.Zero, r1);
+			var Mv2 = Commit(Scalar.Zero, r2);
+			var Mv3 = Commit(Scalar.Zero, r3);
 
-			var pi_null0 = ProofOfExponent(r[0], Generators.Gg);
-			var pi_null1 = ProofOfExponent(r[1], Generators.Gg);
-			var pi_null2 = ProofOfExponent(r[2], Generators.Gg);
-			var pi_null3 = ProofOfExponent(r[3], Generators.Gg);
-
-			var serialNumbers = GenerateRandomNumbers(4);
-			var Ms0 = Commit(serialNumbers[0], s[0]);
-			var Ms1 = Commit(serialNumbers[1], s[1]);
-			var Ms2 = Commit(serialNumbers[2], s[2]);
-			var Ms3 = Commit(serialNumbers[3], s[3]);
+			var (serial0, (serial1, (serial2, (serial3, _)))) = GenerateRandomNumbers(4);
+			var (s0, (s1, (s2, (s3, _)))) = GenerateRandomNumbers(4);
+			var Ms0 = Commit(serial0, s0);
+			var Ms1 = Commit(serial1, s1);
+			var Ms2 = Commit(serial2, s2);
+			var Ms3 = Commit(serial3, s3);
 
 			// this is what we send to the coordinator
-			var attributes = new[] { 
-				new Attribute( Mv0, Ms0 ),
-				new Attribute( Mv1, Ms1 ),
-				new Attribute( Mv2, Ms2 ),
-				new Attribute( Mv3, Ms3 )
-			};
-			var pi_null = new[]{
-				pi_null0,
-				pi_null1,
-				pi_null2,
-				pi_null3,
-			};
+			var attr0 = new Attribute( Mv0, Ms0 );
+			var attr1 =	new Attribute( Mv1, Ms1 );
+			var attr2 =	new Attribute( Mv2, Ms2 );
+			var attr3 =	new Attribute( Mv3, Ms3 );
+
+			var pi_null0 = ProofOfExponent(r0, Generators.Gg);
+			var pi_null1 = ProofOfExponent(r1, Generators.Gg);
+			var pi_null2 = ProofOfExponent(r2, Generators.Gg);
+			var pi_null3 = ProofOfExponent(r3, Generators.Gg);
 
 			var request = new InputRegistrationRequest {
 				Amount = Scalar.Zero,
-				Attributes = attributes,
-				Pi_Null = pi_null,
-				Pi_Sum = Sum(r)
+				Attributes = new[]{
+					attr0,
+					attr1,
+					attr2,
+					attr3,
+				},
+				Pi_Null = new[]{
+					pi_null0,
+					pi_null1,
+					pi_null2,
+					pi_null3,
+				},
+				Pi_Sum = Sum(r0, r1, r2, r3)
 			};
 
+
+			// >>>>>>>>>>>>>>>>>>>> Send input to the coordinator
+			//________________________________________________________________________________________
 			var response = RegisterInputs(request);
 
-			//_______________________________________________________________________________________
+			//________________________________________________________________________________________
 			//
 			// BOB 
 			// _______________________________________________________________________________________ 
-			var z = GenerateRandomNumbers(4);
-			var rc0 = RandomizeCommitments(z[0], attributes[0], response.Credentials[0]);
-			var rc1 = RandomizeCommitments(z[1], attributes[1], response.Credentials[1]);
-			var rc2 = RandomizeCommitments(z[2], attributes[2], response.Credentials[2]);
-			var rc3 = RandomizeCommitments(z[3], attributes[3], response.Credentials[3]);
+			var (cred0, (cred1, (cred2, (cred3, _)))) = response.Credentials;
 
-			var pi_MAC0 = ProofOfMAC(z[0], response.Credentials[0].t, response.iParams.I, rc0.Cx0);
-			var pi_MAC1 = ProofOfMAC(z[1], response.Credentials[1].t, response.iParams.I, rc1.Cx0);
-			var pi_MAC2 = ProofOfMAC(z[2], response.Credentials[2].t, response.iParams.I, rc2.Cx0);
-			var pi_MAC3 = ProofOfMAC(z[3], response.Credentials[3].t, response.iParams.I, rc3.Cx0);
+			// Verify the coordinator issued the credentials using its private key
+			Assert.True(VerifyProofOfParams(pk.Cw, pk.I, cred0.mac.U, cred0.mac.V, attr0, cred0.proof));
+			Assert.True(VerifyProofOfParams(pk.Cw, pk.I, cred1.mac.U, cred1.mac.V, attr1, cred1.proof));
+			Assert.True(VerifyProofOfParams(pk.Cw, pk.I, cred2.mac.U, cred2.mac.V, attr2, cred2.proof));
+			Assert.True(VerifyProofOfParams(pk.Cw, pk.I, cred3.mac.U, cred3.mac.V, attr3, cred3.proof));
 
-			var pi_serial0  = ProofOfSerialNumber(z[0], serialNumbers[0], s[0]);
-			var pi_serial1  = ProofOfSerialNumber(z[1], serialNumbers[1], s[1]);
-			var pi_serial2  = ProofOfSerialNumber(z[2], serialNumbers[2], s[2]);
-			var pi_serial3  = ProofOfSerialNumber(z[3], serialNumbers[3], s[3]);
+			var (z0, (z1, (z2, (z3, _)))) = GenerateRandomNumbers(4);
+			var rc0 = RandomizeCommitments(z0, attr0, cred0.mac);
+			var rc1 = RandomizeCommitments(z1, attr1, cred1.mac);
+			var rc2 = RandomizeCommitments(z2, attr2, cred2.mac);
+			var rc3 = RandomizeCommitments(z3, attr3, cred3.mac);
+
+			var pi_MAC0 = ProofOfMAC(z0, cred0.mac.t, response.iParams.I, rc0.Cx0);
+			var pi_MAC1 = ProofOfMAC(z1, cred1.mac.t, response.iParams.I, rc1.Cx0);
+			var pi_MAC2 = ProofOfMAC(z2, cred2.mac.t, response.iParams.I, rc2.Cx0);
+			var pi_MAC3 = ProofOfMAC(z3, cred3.mac.t, response.iParams.I, rc3.Cx0);
+
+			var pi_serial0  = ProofOfSerialNumber(z0, serial0, s0);
+			var pi_serial1  = ProofOfSerialNumber(z1, serial1, s1);
+			var pi_serial2  = ProofOfSerialNumber(z2, serial2, s2);
+			var pi_serial3  = ProofOfSerialNumber(z3, serial3, s3);
 
 			var outputRegistrationRequest = new OutputRegistrationRequest{
 				ValidCredentialProof = new [] {
-					(rc0, pi_MAC0, serialNumbers[0], pi_serial0),  // how should I call these records? ValidCredentialProof?
-					(rc1, pi_MAC1, serialNumbers[1], pi_serial1),
-					(rc2, pi_MAC2, serialNumbers[2], pi_serial2),
-					(rc3, pi_MAC3, serialNumbers[3], pi_serial3)
+					(rc0, pi_MAC0, serial0, pi_serial0),  // how should I call these records? ValidCredentialProof?
+					(rc1, pi_MAC1, serial1, pi_serial1),
+					(rc2, pi_MAC2, serial2, pi_serial2),
+					(rc3, pi_MAC3, serial3, pi_serial3)
 				},
-				OverSpendingPreventionProof = (Sum(z), Sum(r) ),
+				OverSpendingPreventionProof = (Sum(z0, z1, z2, z3), Sum(r0, r1, r2, r3) ),
 				OutputValue = new Scalar(0)
 			};
 
 			RegisterOutputs(outputRegistrationRequest);
 		}
+
 
 		//_______________________________________________________________________________________
 		//
@@ -123,39 +137,22 @@ namespace Wabisabi.Tests
 			var credential3 = ComputeMAC(sk, attr3);
 
 			var pi_params0 = ProofOfParams(sk, attr0, credential0.U, credential0.t);
-			Assert.True(VerifyProofOfParams(pk.Cw, pk.I, credential0.V, attr0, credential0.U, pi_params0));
+			var pi_params1 = ProofOfParams(sk, attr1, credential1.U, credential1.t);
+			var pi_params2 = ProofOfParams(sk, attr2, credential2.U, credential2.t);
+			var pi_params3 = ProofOfParams(sk, attr3, credential3.U, credential3.t);
 
 			// This is what the coordinator responds to the client.
 			return new InputRegistrationResponse {
 				iParams = pk,
 				Credentials = new[]{
-					credential0,
-					credential1,
-					credential2,
-					credential3
+					(credential0, pi_params0),
+					(credential1, pi_params1),
+					(credential2, pi_params2),
+					(credential3, pi_params3)
 				}
 			};
 		}
 
-		private static Proof ProofOfParams(ServerSecretKey sk, Attribute att, GroupElement U, Scalar t)
-			=> ProofOfKnowledge(
-				new[] { 
-					sk.w, sk.wp, 
-					Scalar.One, sk.x0, sk.x1, sk.yv, sk.ys,
-					sk.w, sk.x0 + (sk.x1 * t), sk.yv, sk.ys},
-				new[] { 
-					Generators.Gw, Generators.Gwp, 
-					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
-					Generators.Gw, U, att.Mv, att.Ms });
-
-		public static bool VerifyProofOfParams(GroupElement Cw, GroupElement I, GroupElement V, Attribute att, GroupElement U, Proof proof)
-			=> VerifyProofOfKnowledge(
-				new[] { Cw, I, V},
-				new[] {
-					Generators.Gw, Generators.Gwp, 
-					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
-					Generators.Gw, U, att.Mv, att.Ms },
-				proof);
 
 		void RegisterOutputs(OutputRegistrationRequest outputRegistrationRequest)
 		{
@@ -200,7 +197,7 @@ namespace Wabisabi.Tests
 	class InputRegistrationResponse
 	{
 		public ServerPublicKey iParams;
-		public MAC[] Credentials;
+		public (MAC mac, Proof proof)[] Credentials;
 	};
 
 	class OutputRegistrationRequest
