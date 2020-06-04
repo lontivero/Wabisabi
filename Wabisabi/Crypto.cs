@@ -109,6 +109,12 @@ namespace Wabisabi
 		public static bool VerifyProofOfExponent(GroupElement P, GroupElement G, Proof proof)
 			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ G }, proof);
 
+		public static Proof ProofOfSum(Scalar z, Scalar r)
+			=> ProofOfKnowledge(new[] { z, r }, new[] { Generators.Gv, Generators.Gg });
+
+		public static bool VerifyProofOfSum(GroupElement P, Proof proof)
+			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ Generators.Gv, Generators.Gg }, proof);
+
 		public static Proof ProofOfMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
 			=> ProofOfKnowledge(
 					new[] { z, t, (z * t.Negate()), z}, 
@@ -223,6 +229,46 @@ namespace Wabisabi
 
 		public GroupElement Mv { get; } 
 		public GroupElement Ms { get; }
+	}
+
+	public readonly struct CredentialRequest
+	{
+		public CredentialRequest(Attribute attribute, Proof rangeProof )
+		{
+			Attribute = attribute;
+			RangeProof = rangeProof;
+		}
+
+		public Attribute Attribute { get; }
+		public Proof RangeProof { get; }
+	}
+
+	public readonly struct Credential
+	{
+		public Credential(MAC mac, Proof proof)
+		{
+			Mac = mac;
+			Proof = proof;
+		}
+
+		public MAC Mac { get; }
+		public Proof Proof { get;  }
+	}
+
+	public readonly struct CredentialProof
+	{
+		public CredentialProof(RandomizedCommitments credential, Proof pi_MAC, Scalar serialNumber, Proof pi_serial)
+		{
+			Credential = credential;
+			Pi_MAC = pi_MAC;
+			SerialNumber = serialNumber;
+			Pi_serial = pi_serial;	
+		}
+
+		public RandomizedCommitments Credential { get; } 
+		public Proof Pi_MAC  { get; }
+		public Scalar SerialNumber  { get; }
+		public Proof Pi_serial  { get; }
 	}
 
 	public readonly struct ServerSecretKey
