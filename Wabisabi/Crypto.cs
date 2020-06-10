@@ -9,8 +9,8 @@ namespace Wabisabi
 	public static class Crypto
 	{
 		#region Pedersen Commitment Scheme functions
-		public static GroupElement Commit(Scalar a, Scalar x)
-			=> ComputePedersenCommitment(a, x, Generators.Gg, Generators.Gh);
+		public static GroupElement Commit(Scalar value, Scalar blindingFactor)
+			=> ComputePedersenCommitment(value, blindingFactor, Generators.Gg, Generators.Gh);
 
 		public static bool OpenCommit(GroupElement commitment, Scalar a, Scalar x)
 			=> Commit(a, x) == commitment;
@@ -18,22 +18,28 @@ namespace Wabisabi
 		public static Func<Scalar, GroupElement> WithRandomFactor(Func<Scalar, Scalar, GroupElement> PedersenCommitmentFunction)
 			=> (Scalar a) => PedersenCommitmentFunction(Crypto.RandomScalar(), a);
 
-		public static RandomizedCommitments RandomizeCommitments(Scalar z, Attribute attr, MAC credential)
+		public static (GroupElement, Scalar) Attribute(Scalar amount)
+			 => Attribute(amount, Crypto.RandomScalar());
+
+		private static (GroupElement, Scalar) Attribute(Scalar amount, Scalar r)
+			=> (Commit(amount, r), r);
+
+		public static RandomizedCommitments RandomizeCommitments(Scalar z, Scalar r, GroupElement Ma, MAC credential)
 			=> new RandomizedCommitments(
-				Randomize(z, Generators.Gv, attr.Mv),
-				Randomize(z, Generators.Gs, attr.Ms),
-				Randomize(z, Generators.Gx0, credential.U),
-				Randomize(z, Generators.Gx1, credential.t * credential.U),
-				Randomize(z, Generators.GV, credential.V));
+				S:   r * Generators.Gs,
+				Ca:  Randomize(z, Generators.Ga, Ma),
+				Cx0: Randomize(z, Generators.Gx0, credential.U),
+				Cx1: Randomize(z, Generators.Gx1, credential.t * credential.U),
+				CV:  Randomize(z, Generators.GV, credential.V));
 
 		public static GroupElement VerifyCredential(ServerSecretKey sk, RandomizedCommitments c)
-			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0) + (sk.x1 * c.Cx1) + (sk.yv * c.Cv)  + (sk.ys * c.Cs)).Negate();
+			=> c.CV + ((sk.w * Generators.Gw) + (sk.x0 * c.Cx0) + (sk.x1 * c.Cx1) + (sk.ya * c.Ca)).Negate();
 
-		private static GroupElement Randomize(Scalar z, GroupElement G, GroupElement H)
-			=> ComputePedersenCommitment(Scalar.One, z, G, H);
+		private static GroupElement Randomize(Scalar z, GroupElement G, GroupElement M)
+			=> (z * G + M);
 
-		private static GroupElement ComputePedersenCommitment(Scalar a, Scalar x, GroupElement G, GroupElement H)
-			=> (x * G) + (a * H);
+		private static GroupElement ComputePedersenCommitment(Scalar value, Scalar blindingFactor, GroupElement G, GroupElement H)
+			=> (value * G) + (blindingFactor * H);
 
 		#endregion Pedersen Commitment Scheme functions
 
@@ -55,14 +61,14 @@ namespace Wabisabi
 
 		#region Wabisabi MAC functions
 
-		public static MAC ComputeMAC(ServerSecretKey sk, Attribute attr)
-			=> ComputeAlgebraicMAC((sk.x0, sk.x1), sk.w * Generators.Gw + (sk.yv * attr.Mv) + (sk.ys * attr.Ms), t: Crypto.RandomScalar(), U: Crypto.RandomScalar() * Generators.G);
+		public static MAC ComputeMAC(ServerSecretKey sk, GroupElement Ma)
+			=> ComputeMAC(sk, Ma, Crypto.RandomScalar());
 
-		private static MAC ComputeMAC(ServerSecretKey sk, Attribute attr, Scalar t, GroupElement U)
-			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.yv * attr.Mv) + (sk.ys * attr.Ms), t, U);
+		private static MAC ComputeMAC(ServerSecretKey sk, GroupElement Ma, Scalar t)
+			=> ComputeAlgebraicMAC((sk.x0, sk.x1), (sk.w * Generators.Gw) + (sk.ya * Ma), t, Generators.GetNums(t));
 
-		public static bool VerifyMAC(ServerSecretKey sk, Attribute attr, MAC mac)
-			=> ComputeMAC(sk, attr, mac.t, mac.U) == mac;
+		public static bool VerifyMAC(ServerSecretKey sk, GroupElement Ma, MAC mac)
+			=> ComputeMAC(sk, Ma, mac.t) == mac;
 
 		#endregion Wabisabi MAC functions
 
@@ -109,11 +115,12 @@ namespace Wabisabi
 		public static bool VerifyProofOfExponent(GroupElement P, GroupElement G, Proof proof)
 			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ G }, proof);
 
+
 		public static Proof ProofOfSum(Scalar z, Scalar r)
-			=> ProofOfKnowledge(new[] { z, r }, new[] { Generators.Gv, Generators.Gg });
+			=> ProofOfKnowledge(new[] { z, r }, new[] { Generators.Ga, Generators.Gh });
 
 		public static bool VerifyProofOfSum(GroupElement P, Proof proof)
-			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ Generators.Gv, Generators.Gg }, proof);
+			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ Generators.Ga, Generators.Gh }, proof);
 
 		public static Proof ProofOfMAC(Scalar z, Scalar t, GroupElement I, GroupElement Cx0)
 			=> ProofOfKnowledge(
@@ -125,35 +132,41 @@ namespace Wabisabi
 					new[]{ I, Cx0, Generators.Gx0, Generators.Gx1}, 
 					proof);
 
-		public static Proof ProofOfSerialNumber(Scalar z, Scalar r, Scalar s)
+		public static Proof ProofOfSerialNumber(Scalar z, Scalar a, Scalar r)
 			=> ProofOfKnowledge(
-				new[] { z, r, s},
-				new[] {Generators.Gs, Generators.Gh, Generators.Gg} );
+				new[] { 
+					r, 
+					z, r, a	},
+				new[] {
+					Generators.Gs, 
+					Generators.Ga, Generators.Gh, Generators.Gg} );
 
-		public static bool VerifyProofOfSerialNumber(GroupElement Cs, Proof proof)
+		public static bool VerifyProofOfSerialNumber(GroupElement S, GroupElement Ca, Proof proof)
 			=> VerifyProofOfKnowledge(
-				new[] { Cs }, 
-				new[] {Generators.Gs, Generators.Gh, Generators.Gg}, 
+				new[] { S, Ca }, 
+				new[] {
+					Generators.Gs, 
+					Generators.Ga, Generators.Gh, Generators.Gg}, 
 				proof);
 
-		public static Proof ProofOfParams(ServerSecretKey sk, Attribute att, GroupElement U, Scalar t)
+		public static Proof ProofOfParams(ServerSecretKey sk, GroupElement Ma, GroupElement U, Scalar t)
 			=> ProofOfKnowledge(
 				new[] { 
 					sk.w, sk.wp, 
-					Scalar.One, sk.x0, sk.x1, sk.yv, sk.ys,
-					sk.w, sk.x0 + (sk.x1 * t), sk.yv, sk.ys},
+					Scalar.One, sk.x0, sk.x1, sk.ya,
+					sk.w, sk.x0 + (sk.x1 * t), sk.ya},
 				new[] { 
 					Generators.Gw, Generators.Gwp, 
-					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
-					Generators.Gw, U, att.Mv, att.Ms });
+					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Ga.Negate(),
+					Generators.Gw, U, Ma });
 
-		public static bool VerifyProofOfParams(GroupElement Cw, GroupElement I, GroupElement U, GroupElement V, Attribute att, Proof proof)
+		public static bool VerifyProofOfParams(GroupElement Cw, GroupElement I, GroupElement U, GroupElement V, GroupElement Ma, Proof proof)
 			=> VerifyProofOfKnowledge(
 				new[] { Cw, I, V},
 				new[] {
 					Generators.Gw, Generators.Gwp, 
-					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Gv.Negate(), Generators.Gs.Negate(),
-					Generators.Gw, U, att.Mv, att.Ms },
+					Generators.GV, Generators.Gx0.Negate(), Generators.Gx1.Negate(), Generators.Ga.Negate(),
+					Generators.Gw, U, Ma },
 				proof);
 
 		#endregion Proof (Schnorr signatures)
@@ -161,14 +174,13 @@ namespace Wabisabi
 		#region Parameters
 
 		public static ServerSecretKey GenServerSecretKey()
-			=> new ServerSecretKey(RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
+			=> new ServerSecretKey(RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar(), RandomScalar());
 
 		public static ServerPublicKey ComputeServerPublicKey(ServerSecretKey sk)
 			=> new ServerPublicKey((sk.w * Generators.Gw + sk.wp * Generators.Gwp),
-				(sk.x0.Negate() * Generators.Gx0) + 
-				(sk.x1.Negate() * Generators.Gx1) + 
-				(sk.yv.Negate() * Generators.Gv ) + 
-				(sk.ys.Negate() * Generators.Gs ) +
+				(sk.x0.Negate() * Generators.Gx0) +
+				(sk.x1.Negate() * Generators.Gx1) +
+				(sk.ya.Negate() * Generators.Ga ) +
 				Generators.GV );
 
 		#endregion Parameters
@@ -219,27 +231,16 @@ namespace Wabisabi
 		#endregion Utils
 	}
 
-	public readonly struct Attribute 
-	{
-		public Attribute(GroupElement mv, GroupElement ms)
-		{
-			this.Mv = mv; 
-			this.Ms = ms; 
-		}
-
-		public GroupElement Mv { get; } 
-		public GroupElement Ms { get; }
-	}
 
 	public readonly struct CredentialRequest
 	{
-		public CredentialRequest(Attribute attribute, Proof rangeProof )
+		public CredentialRequest(GroupElement Ma, Proof rangeProof )
 		{
-			Attribute = attribute;
-			RangeProof = rangeProof;
+			this.Ma = Ma;
+			this.RangeProof = rangeProof;
 		}
 
-		public Attribute Attribute { get; }
+		public GroupElement Ma { get; }
 		public Proof RangeProof { get; }
 	}
 
@@ -257,38 +258,34 @@ namespace Wabisabi
 
 	public readonly struct CredentialProof
 	{
-		public CredentialProof(RandomizedCommitments credential, Proof pi_MAC, Scalar serialNumber, Proof pi_serial)
+		public CredentialProof(RandomizedCommitments credential, Proof pi_MAC, Proof pi_serial)
 		{
 			Credential = credential;
 			Pi_MAC = pi_MAC;
-			SerialNumber = serialNumber;
 			Pi_serial = pi_serial;	
 		}
 
 		public RandomizedCommitments Credential { get; } 
 		public Proof Pi_MAC  { get; }
-		public Scalar SerialNumber  { get; }
 		public Proof Pi_serial  { get; }
 	}
 
 	public readonly struct ServerSecretKey
 	{
-		public ServerSecretKey(Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar yv, Scalar ys)
+		public ServerSecretKey(Scalar w, Scalar wp, Scalar x0, Scalar x1, Scalar ya)
 		{
 			this.w  = w;
 			this.wp = wp;
 			this.x0 = x0;
 			this.x1 = x1;
-			this.yv = yv;
-			this.ys = ys;
+			this.ya = ya;
 		}
 
 		public Scalar w { get; }
 		public Scalar wp { get; }
 		public Scalar x0 { get; }
 		public Scalar x1 { get; }
-		public Scalar yv { get; }
-		public Scalar ys { get; }
+		public Scalar ya { get; }
 	}
 
 	public readonly struct ServerPublicKey
@@ -341,17 +338,17 @@ namespace Wabisabi
 
 	public readonly struct RandomizedCommitments
 	{
-		public RandomizedCommitments(GroupElement Cv, GroupElement Cs, GroupElement Cx0, GroupElement Cx1, GroupElement CV)
+		public RandomizedCommitments(GroupElement S, GroupElement Ca, GroupElement Cx0, GroupElement Cx1, GroupElement CV)
 		{
-			this.Cv = Cv;
-			this.Cs = Cs;
+			this.S = S;
+			this.Ca = Ca;
 			this.Cx0 = Cx0;
 			this.Cx1 = Cx1;
 			this.CV = CV;
 		}
 
-		public GroupElement Cv { get; }
-		public GroupElement Cs { get; }
+		public GroupElement S { get; }
+		public GroupElement Ca { get; }
 		public GroupElement Cx0 { get; }
 		public GroupElement Cx1 { get; }
 		public GroupElement CV { get; }
