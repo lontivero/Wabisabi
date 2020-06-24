@@ -1,5 +1,6 @@
 using System.Linq;
 using NBitcoin.Secp256k1;
+using Wabisabi;
 using Xunit;
 using static Wabisabi.Crypto;
 
@@ -27,12 +28,10 @@ namespace Wabisabi.Tests
 			var (Ma3, r3) = Attribute( a3 );
 
 			var request = new RegistrationRequest {
-				CredentialRequests = new[]{
-					new CredentialRequest(Ma0, /* pi^{null} */ ProofOfExponent(r0, Generators.Gh)), 
-					new CredentialRequest(Ma1, /* pi^{null} */ ProofOfExponent(r1, Generators.Gh)), 
-					new CredentialRequest(Ma2, /* pi^{null} */ ProofOfExponent(r2, Generators.Gh)), 
-					new CredentialRequest(Ma3, /* pi^{null} */ ProofOfExponent(r3, Generators.Gh)) 
-				},
+				CredentialRequests = new CredentialRequest(
+					new[]{ Ma0, Ma1, Ma2, Ma3 },
+					ProofOfExponent(new[]{ r0, r1, r2, r3 }, Generators.Gh)
+				),
 				Credentials = new CredentialProof[0],
 				BalanceProof = ProofOfExponent(Scalar.Zero, Generators.Gg),
 				DeltaValue = Scalar.Zero,
@@ -84,12 +83,10 @@ namespace Wabisabi.Tests
 			var pi_sum = ProofOfSum(z, delta_r);
 
 			request = new RegistrationRequest {
-				CredentialRequests = new[]{
-					new CredentialRequest(Ma0, request.CredentialRequests[0].RangeProof), 
-					new CredentialRequest(Ma1, request.CredentialRequests[1].RangeProof), 
-					new CredentialRequest(Ma2, request.CredentialRequests[2].RangeProof), 
-					new CredentialRequest(Ma3, request.CredentialRequests[3].RangeProof) 
-				},
+				CredentialRequests = new CredentialRequest(
+					new[]{ Ma0, Ma1, Ma2, Ma3 },
+					request.CredentialRequests.RangeProof
+				),
 				Credentials = new [] {
 					new CredentialProof(rc0, pi_MAC0, pi_serial0),  // how should I call these records? ValidCredentialProof?
 					new CredentialProof(rc1, pi_MAC1, pi_serial1),
@@ -110,7 +107,7 @@ namespace Wabisabi.Tests
 			// _______________________________________________________________________________________ 
 
 			var outputRegistrationRequest = new RegistrationRequest{
-				CredentialRequests = new CredentialRequest[0],
+				CredentialRequests = new CredentialRequest(new GroupElement[0], new Proof()),
 				Credentials = new [] {
 					new CredentialProof(rc0, pi_MAC0, pi_serial0),  // how should I call these records? ValidCredentialProof?
 					new CredentialProof(rc1, pi_MAC1, pi_serial1),
@@ -136,16 +133,13 @@ namespace Wabisabi.Tests
 		{
 			pk = ComputeServerPublicKey(sk);
 
-			var (cr0, (cr1, (cr2, (cr3, _)))) = request.CredentialRequests;
+			var Mas = request.CredentialRequests.Mas;
 
 			// Checks the proofs (amounts and range)
 			if (request.DeltaValue == Scalar.Zero)
 			{
 				// Proof of NULL
-				Assert.True(VerifyProofOfExponent(cr0.Ma, Generators.Gh, cr0.RangeProof));
-				Assert.True(VerifyProofOfExponent(cr1.Ma, Generators.Gh, cr1.RangeProof));
-				Assert.True(VerifyProofOfExponent(cr2.Ma, Generators.Gh, cr2.RangeProof));
-				Assert.True(VerifyProofOfExponent(cr3.Ma, Generators.Gh, cr3.RangeProof));
+				Assert.True(VerifyProofOfExponent(Mas, Generators.Gh, request.CredentialRequests.RangeProof));
 			}
 			else
 			{
@@ -155,21 +149,22 @@ namespace Wabisabi.Tests
 
 					var B = (request.DeltaValue * Generators.Gg) +
 							(c0.Credential.Ca + c1.Credential.Ca + c2.Credential.Ca + c3.Credential.Ca) +
-							(cr0.Ma + cr1.Ma + cr2.Ma + cr3.Ma).Negate();
+							Sum(Mas).Negate();
 					Assert.True(VerifyProofOfSum(B, request.BalanceProof));
 				}
 			}
 
 			// We must generate the proof of knowledge of the secret key here
-			var credential0 = ComputeMAC(sk, cr0.Ma);
-			var credential1 = ComputeMAC(sk, cr1.Ma);
-			var credential2 = ComputeMAC(sk, cr2.Ma);
-			var credential3 = ComputeMAC(sk, cr3.Ma);
+			var (cr0, (cr1, (cr2, (cr3, _)))) = Mas;
+			var credential0 = ComputeMAC(sk, cr0);
+			var credential1 = ComputeMAC(sk, cr1);
+			var credential2 = ComputeMAC(sk, cr2);
+			var credential3 = ComputeMAC(sk, cr3);
 
-			var pi_params0 = ProofOfParams(sk, cr0.Ma, credential0.U, credential0.t);
-			var pi_params1 = ProofOfParams(sk, cr1.Ma, credential1.U, credential1.t);
-			var pi_params2 = ProofOfParams(sk, cr2.Ma, credential2.U, credential2.t);
-			var pi_params3 = ProofOfParams(sk, cr3.Ma, credential3.U, credential3.t);
+			var pi_params0 = ProofOfParams(sk, cr0, credential0.U, credential0.t);
+			var pi_params1 = ProofOfParams(sk, cr1, credential1.U, credential1.t);
+			var pi_params2 = ProofOfParams(sk, cr2, credential2.U, credential2.t);
+			var pi_params3 = ProofOfParams(sk, cr3, credential3.U, credential3.t);
 
 			// This is what the coordinator responds to the client.
 			return new RegistrationResponse {
@@ -223,7 +218,7 @@ namespace Wabisabi.Tests
 	public class RegistrationRequest
 	{
 		public Scalar DeltaValue;
-		public CredentialRequest[] CredentialRequests;
+		public CredentialRequest CredentialRequests;
 		public CredentialProof[] Credentials;
 		public Proof BalanceProof;
 	}

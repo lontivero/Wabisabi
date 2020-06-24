@@ -82,8 +82,7 @@ namespace Wabisabi
 			{
 				var n = RandomScalar();
 				nonceKeys.Add(n);
-				var xxx = (n * G);
-				nonce += xxx;
+				nonce += (n * G);
 			}
 
 			var nonces = new [] { nonce };
@@ -111,11 +110,22 @@ namespace Wabisabi
 		}
 
 		public static Proof ProofOfExponent(Scalar sk, GroupElement G)
-			=> ProofOfKnowledge(new[] { sk }, new[] { G });
+			=> ProofOfExponent(new[] { sk }, new[]{ G });
+
+		public static Proof ProofOfExponent(Scalar[] sk, GroupElement G)
+			=> ProofOfKnowledge(sk, Enumerable.Repeat(G, sk.Count()).ToArray());
+
+		public static Proof ProofOfExponent(Scalar[] sk, GroupElement[] Gs)
+			=> ProofOfKnowledge(sk, Gs);
 
 		public static bool VerifyProofOfExponent(GroupElement P, GroupElement G, Proof proof)
-			=> VerifyProofOfKnowledge(new[]{ P }, new[]{ G }, proof);
+			=> VerifyProofOfExponent(new[]{ P }, new[]{ G }, proof);
 
+		public static bool VerifyProofOfExponent(GroupElement[] P, GroupElement G, Proof proof)
+			=> VerifyProofOfKnowledge(P, Enumerable.Repeat(G, proof.s.Count()).ToArray(), proof);
+
+		public static bool VerifyProofOfExponent(GroupElement[] P, GroupElement[] G, Proof proof)
+			=> VerifyProofOfKnowledge(P, G, proof);
 
 		public static Proof ProofOfSum(Scalar z, Scalar r)
 			=> ProofOfKnowledge(new[] { z, r }, new[] { Generators.Ga, Generators.Gh });
@@ -235,13 +245,15 @@ namespace Wabisabi
 
 	public readonly struct CredentialRequest
 	{
-		public CredentialRequest(GroupElement Ma, Proof rangeProof )
+
+		public CredentialRequest(GroupElement[] Mas, Proof rangeProof)
 		{
-			this.Ma = Ma;
+			this.Mas = Mas;
 			this.RangeProof = rangeProof;
 		}
 
-		public GroupElement Ma { get; }
+		public GroupElement[] Mas { get; }
+
 		public Proof RangeProof { get; }
 	}
 
