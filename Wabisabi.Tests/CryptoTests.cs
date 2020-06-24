@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using NBitcoin.Secp256k1;
@@ -55,15 +54,15 @@ namespace Wabisabi.Tests
 			// the total balance in the system didn't change (no money created from thin air)
 			var aliceBalance = new Scalar(163_000u);
 			var aliceBlindinFactor = new Scalar(123456);
-			var commitToAliceBalance = Commit(aliceBlindinFactor, aliceBalance);
+			var commitToAliceBalance = Commit(aliceBalance, aliceBlindinFactor);
 
 			var bobBalance   = new Scalar( 78_000u);
 			var bobBlindinFactor = new Scalar(987654321);
-			var commitToBobBalance = Commit(bobBlindinFactor, bobBalance);
+			var commitToBobBalance = Commit(bobBalance, bobBlindinFactor);
 
 			var valueTransferredToBob = new Scalar(25_000);
 			var valueTransferredBlindinFactor = new Scalar(8050);
-			var commitToTransferredValue = Commit(valueTransferredBlindinFactor, valueTransferredToBob);
+			var commitToTransferredValue = Commit(valueTransferredToBob, valueTransferredBlindinFactor);
 
 			var aliceNewBalance = aliceBalance.Add(valueTransferredToBob.Negate());
 			var bobNewBalance = bobBalance.Add(valueTransferredToBob);
@@ -80,10 +79,8 @@ namespace Wabisabi.Tests
 		[Fact]
 		public void AttributesAreCommutative()
 		{
-			var attr = WithRandomFactor(Commit);
-
-			var a = attr(new Scalar(1_234_567));
-			var b = attr(new Scalar(7_564_321));
+			var (a, _) = Attribute(new Scalar(1_234_567));
+			var (b, _) = Attribute(new Scalar(7_564_321));
 
 			Assert.Equal((a+b), b+a);
 		}
@@ -103,16 +100,30 @@ namespace Wabisabi.Tests
 		public void CanProduceAndVerifyMAC()
 		{
 			var sk = GenServerSecretKey();
-			var Mv = Commit(new Scalar( 21_000_000), RandomScalar());
-			var Ms = Commit(Crypto.RandomScalar(), Crypto.RandomScalar());
-			var attribute = new Attribute(Mv, Ms);
-			var commutedAttribute = new Attribute(Ms, Mv);
+			var (attr, _) = Attribute(new Scalar( 21_000_000));
 
-			var mac = ComputeMAC(sk, attribute);
+			var mac = ComputeMAC(sk, attr);
 
-			Assert.True(VerifyMAC(sk, attribute, mac));
-			Assert.False(VerifyMAC(sk, commutedAttribute, mac));
+			Assert.True(VerifyMAC(sk, attr, mac));
 		}
+
+		[Fact]
+		public void CanProduceAndVerifyProofOfRepresentation()
+		{
+			var sk = GenServerSecretKey();
+			var (attr, _) = Attribute(new Scalar( 21_000_000));
+
+			var w0 = new Scalar(11);
+			var w1 = new Scalar(17);
+
+			var C = Commit(w0, w1);
+
+			var proof = ProofOfKnowledge(new[]{ w0, w1 }, new[]{ Generators.Gg, Generators.Gh});
+			Assert.True(VerifyProofOfKnowledge(new[] { C }, new[]{ Generators.Gg, Generators.Gh}, proof));
+		}
+
+
+		[Fact]
 
 		private static Scalar RandomScalarForValue()
 		{
@@ -120,54 +131,5 @@ namespace Wabisabi.Tests
 			ret.ShrInt(26, out ret);
 			return ret;
 		}
-
-		/////////////////////////////////////////////////
-
-		[Fact]
-		public void xxxxxxxxxxxxx()
-		{
-			RangeProof(12345678);
-		}
-
-		private static Scalar[] BlindingVector(int nbits)
-			=> Enumerable.Range(0, nbits).Select(_ => RandomScalar()).ToArray();
-
-		private static string RangeProof(uint value)
-		{
-			var b = RandomScalar();
-			var V = Commit(new Scalar(value), b);
-			var aL = Vectorize(value);
-			var aR = Substract(aL, Vectorize(uint.MaxValue));
-			Assert.Equal(Vectorize(0), Hadamard(aL, aR));
-			Assert.Equal(value, InnerProduct(aL, PowerVector(2)));
-
-			return null;
-		}
-
-		private static int[] Vectorize(uint value)
-		{
-			var buffer = new int[32];
-			var pos = buffer.Length - 1;
-			while (value > 0)
-			{
-				buffer[pos] = (int)value % 2;
-				pos--;
-				value /= 2;
-			}
-			return buffer;
-		}
-
-		private static int[] Substract(int[] v1, int[] v2)
-			=> Enumerable.Zip(v1, v2).Select( t => t.First - t.Second).ToArray();
-
-		private static int[] Hadamard(int[] v1, int[] v2)
-			=> Enumerable.Zip(v1, v2).Select( t => (t.First * t.Second) % (8 * sizeof(uint)) ).ToArray();
-
-		private static uint InnerProduct(int[] v1, int[] v2)
-			=> (uint)Enumerable.Zip(v1, v2).Select( t => (t.First * t.Second)).Sum();
-
-		private static int[] PowerVector(int p)
-			=> Enumerable.Range(0, (8 * sizeof(uint))).Select(x => (int)Math.Pow(p, x)).Reverse().ToArray();
-
 	}
 }

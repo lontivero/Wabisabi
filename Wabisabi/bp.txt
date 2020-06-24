@@ -1,0 +1,49 @@
+		/////////////////////////////////////////////////
+
+		[Fact]
+		public void xxxxxxxxxxxxx()
+		{
+			RangeProof(12345678);
+		}
+
+		private static Scalar[] BlindingVector(int nbits)
+			=> Enumerable.Range(0, nbits).Select(_ => RandomScalar()).ToArray();
+
+		private static string RangeProof(uint value)
+		{
+			var b = RandomScalar();
+			var V = Commit(new Scalar(value), b);
+			var aL = Vectorize(value);
+			var aR = Substract(aL, Vectorize(uint.MaxValue));
+			Assert.Equal(Vectorize(0), Hadamard(aL, aR));
+			Assert.Equal(value, InnerProduct(aL, PowerVector(2)));
+
+			return null;
+		}
+
+		private static int[] Vectorize(uint value)
+		{
+			var buffer = new int[32];
+			var pos = buffer.Length - 1;
+			while (value > 0)
+			{
+				buffer[pos] = (int)value % 2;
+				pos--;
+				value /= 2;
+			}
+			return buffer;
+		}
+
+		private static int[] Substract(int[] v1, int[] v2)
+			=> Enumerable.Zip(v1, v2).Select( t => t.First - t.Second).ToArray();
+
+		private static int[] Hadamard(int[] v1, int[] v2)
+			=> Enumerable.Zip(v1, v2).Select( t => (t.First * t.Second) % (8 * sizeof(uint)) ).ToArray();
+
+		private static uint InnerProduct(int[] v1, int[] v2)
+			=> (uint)Enumerable.Zip(v1, v2).Select( t => (t.First * t.Second)).Sum();
+
+		private static int[] PowerVector(int p)
+			=> Enumerable.Range(0, (8 * sizeof(uint))).Select(x => (int)Math.Pow(p, x)).Reverse().ToArray();
+
+	}

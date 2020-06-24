@@ -77,14 +77,16 @@ namespace Wabisabi
 		public static Proof ProofOfKnowledge(Scalar[] ws, GroupElement[] Gs)
 		{
 			var nonceKeys = new List<Scalar>();
-			var nonces = new List<GroupElement>();
+			var nonce = new GroupElement(GE.Infinity);
 			foreach (var G in Gs)
 			{
 				var n = RandomScalar();
 				nonceKeys.Add(n);
-				nonces.Add(n * G);
+				var xxx = (n * G);
+				nonce += xxx;
 			}
 
+			var nonces = new [] { nonce };
 			var e = BuildChallenge(nonces.Concat(Gs));
 
 			var ss = new List<Scalar>();
@@ -92,21 +94,20 @@ namespace Wabisabi
 			{
 				ss.Add(nonceKey + witness * e);
 			}
-			return new Proof (Enumerable.Zip(nonces, ss));
+			return new Proof (nonces, ss);
 		}
 
 		public static bool VerifyProofOfKnowledge(GroupElement[] Ps, GroupElement[] Gs, Proof proof)
 		{
 			var nonces = new List<GroupElement>();
-			foreach (var (pi, G) in Enumerable.Zip(proof.Proofs, Gs))
+			foreach (var (s, G) in Enumerable.Zip(proof.s, Gs))
 			{
-				nonces.Add(pi.s * G);
+				nonces.Add(s * G);
 			}
 
-			var Rs = proof.Proofs.Select(p => p.R);
-			var e = BuildChallenge(Rs.Concat(Gs));
+			var e = BuildChallenge(proof.R.Concat(Gs));
 
-			return Sum(nonces) == Sum(Rs) + Sum(Ps.Select(P => (e * P)));
+			return Sum(nonces) == Sum(proof.R) + Sum(Ps.Select(P => (e * P)));
 		}
 
 		public static Proof ProofOfExponent(Scalar sk, GroupElement G)
@@ -356,11 +357,13 @@ namespace Wabisabi
 
 	public readonly struct Proof
 	{
-		public readonly IEnumerable<(GroupElement R, Scalar s)> Proofs { get; }
+		public IEnumerable<GroupElement> R { get; }
+		public IEnumerable<Scalar> s { get; }
 
-		public Proof(IEnumerable<(GroupElement R, Scalar s)> proofs)
+		public Proof(IEnumerable<GroupElement> R, IEnumerable<Scalar> s)
 		{
-			this.Proofs = proofs;
+			this.R = R;
+			this.s = s;
 		}
 	}
 }
